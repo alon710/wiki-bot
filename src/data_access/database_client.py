@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from sqlmodel import text
+from sqlmodel import Session, text
 from typing import Optional, Generator
 from contextlib import contextmanager
 
@@ -43,8 +42,8 @@ class DatabaseClient:
                 max_overflow=settings.database.max_overflow,
             )
 
-            self._session_factory = sessionmaker(
-                autocommit=False, autoflush=False, bind=self._engine
+            self._session_factory = lambda: Session(
+                bind=self._engine, autocommit=False, autoflush=False
             )
 
             logger.info(

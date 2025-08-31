@@ -17,11 +17,16 @@ class Environment(str, Enum):
 class Language(str, Enum):
     ENGLISH = "en"
     HEBREW = "he"
+    RUSSIAN = "ru"
+    ARABIC = "ar"
+    SPANISH = "es"
 
 
 class DatabaseSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="DATABASE_", env_file=ENV_FILE, extra="ignore")
-    
+    model_config = SettingsConfigDict(
+        env_prefix="DATABASE_", env_file=ENV_FILE, extra="ignore"
+    )
+
     url: str = Field(alias="DATABASE_URL")
     echo: bool = Field(alias="DATABASE_ECHO", default=False)
     pool_size: int = Field(alias="DATABASE_POOL_SIZE", default=5)
@@ -29,8 +34,10 @@ class DatabaseSettings(BaseSettings):
 
 
 class TwilioSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TWILIO_", env_file=ENV_FILE, extra="ignore")
-    
+    model_config = SettingsConfigDict(
+        env_prefix="TWILIO_", env_file=ENV_FILE, extra="ignore"
+    )
+
     account_sid: str = Field(alias="TWILIO_ACCOUNT_SID")
     auth_token: str = Field(alias="TWILIO_AUTH_TOKEN")
     whatsapp_from: str = Field(alias="TWILIO_WHATSAPP_FROM")
@@ -38,33 +45,45 @@ class TwilioSettings(BaseSettings):
 
 
 class OpenRouterSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="OPENROUTER_", env_file=ENV_FILE, extra="ignore")
-    
+    model_config = SettingsConfigDict(
+        env_prefix="OPENROUTER_", env_file=ENV_FILE, extra="ignore"
+    )
+
     api_key: str = Field(alias="OPENROUTER_API_KEY")
     model: str = Field(alias="OPENROUTER_MODEL", default="openai/gpt-4o-mini")
-    base_url: str = Field(alias="OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
+    base_url: str = Field(
+        alias="OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1"
+    )
     max_tokens: int = Field(alias="OPENROUTER_MAX_TOKENS", default=150)
     temperature: float = Field(alias="OPENROUTER_TEMPERATURE", default=0.7)
 
 
 class WikipediaSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="WIKIPEDIA_", env_file=ENV_FILE, extra="ignore")
-    
+    model_config = SettingsConfigDict(
+        env_prefix="WIKIPEDIA_", env_file=ENV_FILE, extra="ignore"
+    )
+
     user_agent: str = Field(alias="WIKIPEDIA_USER_AGENT", default="WikiFactsBot/1.0")
     timeout: int = Field(alias="WIKIPEDIA_TIMEOUT", default=10)
 
 
 class SchedulerSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="SCHEDULER_", env_file=ENV_FILE, extra="ignore")
-    
+    model_config = SettingsConfigDict(
+        env_prefix="SCHEDULER_", env_file=ENV_FILE, extra="ignore"
+    )
+
     fact_generation_hour: int = Field(alias="SCHEDULER_FACT_GENERATION_HOUR", default=9)
-    fact_generation_minute: int = Field(alias="SCHEDULER_FACT_GENERATION_MINUTE", default=0)
+    fact_generation_minute: int = Field(
+        alias="SCHEDULER_FACT_GENERATION_MINUTE", default=0
+    )
     timezone: str = Field(alias="SCHEDULER_TIMEZONE", default="UTC")
 
 
 class ServerSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="SERVER_", env_file=ENV_FILE, extra="ignore")
-    
+    model_config = SettingsConfigDict(
+        env_prefix="SERVER_", env_file=ENV_FILE, extra="ignore"
+    )
+
     host: str = Field(alias="SERVER_HOST", default="0.0.0.0")
     port: int = Field(alias="SERVER_PORT", default=8000)
     reload: bool = Field(alias="SERVER_RELOAD", default=False)
@@ -72,17 +91,21 @@ class ServerSettings(BaseSettings):
 
 
 class LoggingSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="LOG_", env_file=ENV_FILE, extra="ignore")
-    
+    model_config = SettingsConfigDict(
+        env_prefix="LOG_", env_file=ENV_FILE, extra="ignore"
+    )
+
     level: str = Field(alias="LOG_LEVEL", default="INFO")
     format: str = Field(alias="LOG_FORMAT", default="console")
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
-    
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore"
+    )
+
     env_id: Environment = Field(validation_alias="ENV_ID", default=Environment.LOCAL)
-    
+
     database: DatabaseSettings = DatabaseSettings()
     twilio: TwilioSettings = TwilioSettings()
     openrouter: OpenRouterSettings = OpenRouterSettings()

@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import all models to ensure they're registered with SQLModel metadata
+from src.models import user, fact, message  # noqa
 
 from src.config.settings import settings
 from src.api.routes import webhook, admin
@@ -18,6 +19,7 @@ from src.api.middleware import RequestLoggingMiddleware, SecurityHeadersMiddlewa
 from src.services.scheduler_service import scheduler_service
 from src.data_access.database_client import database_client
 from src.utils.logger import get_logger
+from sqlmodel import SQLModel
 
 logger = get_logger(__name__)
 
@@ -38,6 +40,15 @@ async def lifespan(app: FastAPI):
         if not database_client.health_check():
             logger.error("Database connection failed during startup")
             raise RuntimeError("Database connection failed")
+
+        # Create database tables if they don't exist
+        logger.info("Creating database tables")
+        try:
+            SQLModel.metadata.create_all(database_client.engine)
+            logger.info("Database tables created/verified successfully")
+        except Exception as e:
+            logger.error("Failed to create database tables", error=str(e))
+            raise RuntimeError(f"Database setup failed: {e}")
 
         # Start scheduler
         logger.info("Starting scheduler service")
