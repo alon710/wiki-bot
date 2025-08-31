@@ -186,32 +186,6 @@ Daily Fact:
         
         return True
     
-    def test_connection(self) -> bool:
-        """Test the OpenRouter API connection."""
-        try:
-            response = self.client.chat.completions.create(
-                model=settings.openrouter.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": "Hello, this is a test. Please respond with 'Test successful'."
-                    }
-                ],
-                max_tokens=10
-            )
-            
-            if response.choices and len(response.choices) > 0:
-                logger.info("OpenRouter API connection test successful", 
-                           model=settings.openrouter.model)
-                return True
-            
-            return False
-            
-        except Exception as e:
-            logger.error("OpenRouter API connection test failed", 
-                        model=settings.openrouter.model,
-                        error=str(e))
-            return False
 
 
 # Global service instance

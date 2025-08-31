@@ -26,43 +26,45 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
-    
+
     Handles startup and shutdown events for the FastAPI application.
     """
     # Startup
     logger.info("Starting WikiBot application")
-    
+
     try:
         # Initialize database connection
         logger.info("Initializing database connection")
         if not database_client.health_check():
             logger.error("Database connection failed during startup")
             raise RuntimeError("Database connection failed")
-        
+
         # Start scheduler
         logger.info("Starting scheduler service")
         scheduler_service.start()
-        
-        logger.info("WikiBot application started successfully",
-                   host=settings.server.host,
-                   port=settings.server.port)
-        
+
+        logger.info(
+            "WikiBot application started successfully",
+            host=settings.server.host,
+            port=settings.server.port,
+        )
+
         yield
-        
+
     except Exception as e:
         logger.error("Failed to start WikiBot application", error=str(e))
         raise
     finally:
         # Shutdown
         logger.info("Shutting down WikiBot application")
-        
+
         try:
             # Stop scheduler
             logger.info("Stopping scheduler service")
             scheduler_service.shutdown()
-            
+
             logger.info("WikiBot application shut down successfully")
-            
+
         except Exception as e:
             logger.error("Error during application shutdown", error=str(e))
 
@@ -70,7 +72,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """
     Create and configure the FastAPI application.
-    
+
     Returns:
         Configured FastAPI application instance
     """
@@ -81,13 +83,13 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
         docs_url="/docs" if settings.env_id != "production" else None,
-        redoc_url="/redoc" if settings.env_id != "production" else None
+        redoc_url="/redoc" if settings.env_id != "production" else None,
     )
-    
+
     # Add middleware
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
-    
+
     # Add CORS middleware for development
     if settings.env_id in ["local", "development"]:
         app.add_middleware(
@@ -97,11 +99,11 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-    
+
     # Include routers
     app.include_router(webhook.router, tags=["Webhooks"])
     app.include_router(admin.router, tags=["Admin"])
-    
+
     return app
 
 
@@ -109,7 +111,7 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def root():
     """Root endpoint with basic information."""
     return {
@@ -117,43 +119,45 @@ async def root():
         "description": "Wikipedia Facts WhatsApp Bot",
         "version": "1.0.0",
         "status": "running",
-        "environment": settings.env_id.value
+        "environment": settings.env_id.value,
     }
 
 
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
 async def simple_health():
     """Simple health check endpoint."""
     try:
         db_healthy = database_client.health_check()
-        
+
         return {
             "status": "healthy" if db_healthy else "unhealthy",
             "database": "connected" if db_healthy else "disconnected",
-            "timestamp": "2024-01-01T00:00:00Z"  # Will be actual timestamp
+            "timestamp": "2024-01-01T00:00:00Z",  # Will be actual timestamp
         }
     except Exception as e:
         logger.error("Health check failed", error=str(e))
         return {
             "status": "unhealthy",
             "error": str(e),
-            "timestamp": "2024-01-01T00:00:00Z"  # Will be actual timestamp
+            "timestamp": "2024-01-01T00:00:00Z",  # Will be actual timestamp
         }
 
 
 if __name__ == "__main__":
     import uvicorn
-    
-    logger.info("Starting WikiBot with uvicorn",
-               host=settings.server.host,
-               port=settings.server.port,
-               reload=settings.server.reload,
-               log_level=settings.server.log_level)
-    
+
+    logger.info(
+        "Starting WikiBot with uvicorn",
+        host=settings.server.host,
+        port=settings.server.port,
+        reload=settings.server.reload,
+        log_level=settings.server.log_level,
+    )
+
     uvicorn.run(
         "main:app",
         host=settings.server.host,
         port=settings.server.port,
         reload=settings.server.reload,
-        log_level=settings.server.log_level
+        log_level=settings.server.log_level,
     )

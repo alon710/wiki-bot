@@ -1,4 +1,3 @@
-from datetime import datetime
 from datetime import date as DateType
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -252,52 +251,6 @@ class SchedulerService:
             raise
     
     
-    def trigger_daily_facts_now(self):
-        """Manually trigger daily fact generation (for testing)."""
-        try:
-            job = self.scheduler.get_job('daily_facts_generation')
-            if job:
-                self.scheduler.modify_job('daily_facts_generation', next_run_time=datetime.now())
-                logger.info("Daily facts job triggered manually")
-            else:
-                logger.error("Daily facts job not found")
-        except Exception as e:
-            logger.error("Failed to trigger daily facts job", error=str(e))
-    
-    def get_job_status(self, job_id: str) -> dict:
-        """Get status information for a specific job."""
-        try:
-            job = self.scheduler.get_job(job_id)
-            if job:
-                return {
-                    'id': job.id,
-                    'name': job.name,
-                    'next_run_time': job.next_run_time.isoformat() if job.next_run_time else None,
-                    'func': str(job.func),
-                    'trigger': str(job.trigger)
-                }
-            else:
-                return {'error': 'Job not found'}
-        except Exception as e:
-            logger.error("Failed to get job status", job_id=job_id, error=str(e))
-            return {'error': str(e)}
-    
-    def list_jobs(self) -> list:
-        """List all scheduled jobs."""
-        try:
-            jobs = []
-            for job in self.scheduler.get_jobs():
-                jobs.append({
-                    'id': job.id,
-                    'name': job.name,
-                    'next_run_time': job.next_run_time.isoformat() if job.next_run_time else None,
-                    'func': str(job.func),
-                    'trigger': str(job.trigger)
-                })
-            return jobs
-        except Exception as e:
-            logger.error("Failed to list jobs", error=str(e))
-            return []
 
 
 # Global service instance

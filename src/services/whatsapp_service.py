@@ -378,30 +378,6 @@ class WhatsAppService:
         
         return results
     
-    async def test_connection(self) -> bool:
-        """Test the Twilio API connection."""
-        try:
-            # Test connection by fetching account information
-            account = self.client.api.accounts(settings.twilio.account_sid).fetch()
-            
-            if account and account.status == 'active':
-                logger.info("Twilio API connection test successful", 
-                           account_sid=settings.twilio.account_sid,
-                           account_status=account.status)
-                return True
-            else:
-                logger.error("Twilio account not active", 
-                           account_status=getattr(account, 'status', 'unknown'))
-                return False
-            
-        except TwilioException as e:
-            logger.error("Twilio API connection test failed",
-                        error_code=getattr(e, 'code', None),
-                        error_message=str(e))
-            return False
-        except Exception as e:
-            logger.error("Twilio API connection test failed", error=str(e))
-            return False
 
 
 # Global service instance
