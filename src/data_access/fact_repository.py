@@ -1,6 +1,7 @@
 from datetime import date as DateType
 from typing import Optional, List
 from sqlmodel import select
+from sqlalchemy import desc
 
 from src.models.fact import DailyFact, DailyFactCreate
 from src.data_access.database_client import database_client
@@ -80,7 +81,7 @@ class FactRepository:
                 statement = (
                     select(DailyFact)
                     .where(DailyFact.language == language)
-                    .order_by(DailyFact.date.desc())
+                    .order_by(desc(DailyFact.date))
                     .limit(limit)
                 )
                 facts = session.exec(statement).all()
@@ -129,7 +130,7 @@ class FactRepository:
                 statement = (
                     select(DailyFact)
                     .where(DailyFact.language == language)
-                    .order_by(DailyFact.date.desc())
+                    .order_by(desc(DailyFact.date))
                     .limit(1)
                 )
                 fact = session.exec(statement).first()

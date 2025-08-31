@@ -79,33 +79,33 @@ class WikipediaService:
                 
             except Exception as e:
                 # Handle disambiguation pages by picking a random option
-                if hasattr(e, 'options') and e.options and len(e.options) > 0:
-                    try:
-                        random_option = random.choice(e.options)
-                        disambig_page = client.page(random_option)
-                        
-                        if self._is_suitable_article(disambig_page, language):
-                            article_data = {
-                                "title": disambig_page.title,
-                                "url": disambig_page.fullurl,
-                                "summary": disambig_page.summary[:500],
-                                "full_text": disambig_page.text[:2000] if disambig_page.text else disambig_page.summary,
-                                "language": language.value
-                            }
+                if hasattr(e, 'options'):
+                    options = getattr(e, 'options', None)
+                    if options and len(options) > 0:
+                        try:
+                            random_option = random.choice(options)
+                            disambig_page = client.page(random_option)
                             
-                            logger.info("Disambiguation article fetched successfully",
-                                       language=language,
-                                       title=disambig_page.title,
-                                       attempt=attempts)
-                            
-                            return article_data
-                    except Exception as disambig_error:
-                        logger.warning("Error handling disambiguation page",
-                                     language=language,
-                                     error=str(disambig_error),
-                                     attempt=attempts)
-                        
-            except Exception as e:
+                            if self._is_suitable_article(disambig_page, language):
+                                article_data = {
+                                    "title": disambig_page.title,
+                                    "url": disambig_page.fullurl,
+                                    "summary": disambig_page.summary[:500],
+                                    "full_text": disambig_page.text[:2000] if disambig_page.text else disambig_page.summary,
+                                    "language": language.value
+                                }
+                                
+                                logger.info("Disambiguation article fetched successfully",
+                                           language=language,
+                                           title=disambig_page.title,
+                                           attempt=attempts)
+                                
+                                return article_data
+                        except Exception as disambig_error:
+                            logger.warning("Error handling disambiguation page",
+                                         language=language,
+                                         error=str(disambig_error),
+                                         attempt=attempts)
                 logger.warning("Error fetching random article",
                              language=language,
                              error=str(e),
