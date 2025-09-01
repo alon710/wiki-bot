@@ -95,18 +95,25 @@ async def process_whatsapp_message(message: WhatsAppWebhookMessage):
                         user_id=user.id,
                         user_language=user.language)
             
-            # Send main menu for new users
-            await whatsapp_service.send_main_menu(phone, user.language)
+            # Check if using sandbox - send join instructions first
+            if settings.twilio.is_sandbox:
+                await whatsapp_service.send_sandbox_instructions(phone, user.language)
+            else:
+                # Send main menu for new users
+                await whatsapp_service.send_main_menu(phone, user.language, user)
             
-            logger.info("New user created and main menu sent", phone=phone)
+            logger.info("New user created and instructions sent", phone=phone, sandbox=settings.twilio.is_sandbox)
             return
+        
+        # Update last message timestamp for existing users
+        user_repository.update_last_message(phone)
         
         # Process number responses or show main menu for any text message
         if body and body.strip().isdigit():
             await handle_number_response(phone, body.strip())
         else:
             # Any non-number message should get main menu
-            await whatsapp_service.send_main_menu(phone, user.language)
+            await whatsapp_service.send_main_menu(phone, user.language, user)
         
     except Exception as e:
         logger.error("Failed to process WhatsApp message",
@@ -148,11 +155,11 @@ async def handle_number_response(phone: str, number: str):
             
         elif number == "2":
             # Manage Subscription - show subscription menu
-            await whatsapp_service.send_subscription_menu(phone, current_language, user.subscribed)
+            await whatsapp_service.send_subscription_menu(phone, current_language, user.subscribed, user)
             
         elif number == "3":
             # Change Language - show language menu
-            await whatsapp_service.send_language_menu(phone, current_language)
+            await whatsapp_service.send_language_menu(phone, current_language, user)
             
         elif number == "4":
             # Help
@@ -160,7 +167,7 @@ async def handle_number_response(phone: str, number: str):
             
         elif number == "0":
             # Back to main menu
-            await whatsapp_service.send_main_menu(phone, current_language)
+            await whatsapp_service.send_main_menu(phone, current_language, user)
             
         else:
             # Handle subscription and language menu responses
@@ -221,7 +228,7 @@ async def handle_sub_menu_response(phone: str, number: str, user):
                 )
         else:
             # Unknown number - show main menu
-            await whatsapp_service.send_main_menu(phone, current_language)
+            await whatsapp_service.send_main_menu(phone, current_language, user)
             
     except Exception as e:
         logger.error("Failed to handle sub menu response",

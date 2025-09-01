@@ -17,9 +17,19 @@ class WhatsAppService:
     def __init__(self):
         """Initialize Twilio client."""
         self.client = Client(settings.twilio.account_sid, settings.twilio.auth_token)
+        
+        # Log sandbox detection
+        if settings.twilio.is_sandbox:
+            logger.warning("Using Twilio WhatsApp Sandbox - users must join sandbox first")
+        else:
+            logger.info("Using Twilio WhatsApp Business API")
+        
+        if not settings.twilio.has_templates:
+            logger.warning("No WhatsApp templates configured - messages may fail outside session window")
+        
         logger.info("WhatsApp service initialized")
     
-    async def send_message(self, phone: str, content: str, message_type: MessageType) -> Optional[str]:
+    async def send_message(self, phone: str, content: str, message_type: MessageType, user=None) -> Optional[str]:
         """
         Send a WhatsApp message to a specific phone number.
         
@@ -27,6 +37,7 @@ class WhatsAppService:
             phone: Recipient phone number (without whatsapp: prefix)
             content: Message content
             message_type: Type of message being sent
+            user: User object to check session status (optional)
         
         Returns:
             Message ID (SID) if successful, None if failed
@@ -40,6 +51,14 @@ class WhatsAppService:
             
             # Format phone number with whatsapp: prefix if not already present
             to_number = phone if phone.startswith('whatsapp:') else f'whatsapp:{phone}'
+            
+            # Check if we need to use template message
+            should_use_template = False
+            if user and not user.is_in_session_window() and not settings.twilio.is_sandbox:
+                should_use_template = True
+                logger.info("User outside session window, should use template message",
+                           phone=phone,
+                           last_message_at=user.last_message_at)
             
             # Send message via Twilio
             # Note: Twilio client is synchronous, but we're wrapping it in async context
@@ -55,7 +74,9 @@ class WhatsAppService:
             logger.info("WhatsApp message sent successfully",
                        phone=phone,
                        message_type=message_type,
-                       external_id=external_id)
+                       external_id=external_id,
+                       sandbox=settings.twilio.is_sandbox,
+                       should_use_template=should_use_template)
             
             return external_id
             
@@ -64,13 +85,15 @@ class WhatsAppService:
                         phone=phone,
                         message_type=message_type,
                         error_code=getattr(e, 'code', None),
-                        error_message=str(e))
+                        error_message=str(e),
+                        sandbox=settings.twilio.is_sandbox)
             return None
         except Exception as e:
             logger.error("Failed to send WhatsApp message",
                         phone=phone,
                         message_type=message_type,
-                        error=str(e))
+                        error=str(e),
+                        sandbox=settings.twilio.is_sandbox)
             return None
     
     async def send_daily_fact(self, user: User, fact_content: str) -> bool:
@@ -378,13 +401,60 @@ class WhatsAppService:
         
         return results
     
-    async def send_main_menu(self, phone: str, language: Language) -> bool:
+    async def send_sandbox_instructions(self, phone: str, language: Language) -> bool:
+        """
+        Send Twilio Sandbox join instructions to new users.
+        
+        Args:
+            phone: User's phone number
+            language: User's language preference
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if language == Language.HEBREW:
+                content = (
+                    "🔧 הודעה חשובה!\n\n"
+                    "אתה משתמש בסביבת הבדיקות של Twilio WhatsApp.\n"
+                    "כדי לקבל הודעות, עליך לשלוח תחילה את המסר:\n"
+                    "join depend-wheat\n\n"
+                    "שלח הודעה זו ל: whatsapp:+14155238886\n\n"
+                    "לאחר מכן תוכל לחזור לכאן ולהתחיל להשתמש בבוט."
+                )
+            else:
+                content = (
+                    "🔧 Important Notice!\n\n"
+                    "You are using the Twilio WhatsApp Sandbox.\n"
+                    "To receive messages, you must first send:\n"
+                    "join depend-wheat\n\n"
+                    "Send this message to: whatsapp:+14155238886\n\n"
+                    "After that, you can return here and start using the bot."
+                )
+            
+            message_id = await self.send_message(
+                phone=phone,
+                content=content,
+                message_type=MessageType.WELCOME
+            )
+            
+            return message_id is not None
+            
+        except Exception as e:
+            logger.error("Failed to send sandbox instructions",
+                        phone=phone,
+                        language=language,
+                        error=str(e))
+            return False
+    
+    async def send_main_menu(self, phone: str, language: Language, user=None) -> bool:
         """
         Send main menu with text options.
         
         Args:
             phone: User's phone number
             language: User's language preference
+            user: User object for session tracking (optional)
         
         Returns:
             True if successful, False otherwise
@@ -412,7 +482,8 @@ class WhatsAppService:
             message_id = await self.send_message(
                 phone=phone,
                 content=content,
-                message_type=MessageType.WELCOME
+                message_type=MessageType.WELCOME,
+                user=user
             )
             
             return message_id is not None
@@ -424,7 +495,7 @@ class WhatsAppService:
                         error=str(e))
             return False
     
-    async def send_subscription_menu(self, phone: str, language: Language, current_status: bool) -> bool:
+    async def send_subscription_menu(self, phone: str, language: Language, current_status: bool, user=None) -> bool:
         """
         Send subscription management menu.
         
@@ -432,6 +503,7 @@ class WhatsAppService:
             phone: User's phone number
             language: User's language preference
             current_status: Current subscription status
+            user: User object for session tracking (optional)
         
         Returns:
             True if successful, False otherwise

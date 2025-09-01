@@ -165,6 +165,24 @@ Configure your Twilio WhatsApp webhook to send messages to:
 
 In your Twilio Console, set the webhook URL to: `https://yourdomain.com/webhook/whatsapp`
 
+### WhatsApp Business API Setup
+
+#### For Testing (Sandbox)
+1. **Twilio Sandbox**: Use the default sandbox number `whatsapp:+14155238886`
+2. **User Setup**: Users must first send `join depend-wheat` to the sandbox number
+3. **Limitations**: 72-hour session window, limited users, not for production
+
+#### For Production (Business API)
+1. **WhatsApp Business Account**: Register with Meta/Facebook
+2. **Template Messages**: Create and submit templates for approval:
+   - Welcome message template
+   - Menu/navigation templates  
+   - Subscription management templates
+   - Language selection templates
+3. **Configure Template SIDs**: Add approved template SIDs to your environment variables
+4. **24-Hour Session Window**: Free-form messages only allowed within 24 hours of user's last message
+5. **Outside Session Window**: Must use pre-approved template messages only
+
 ## Development
 
 ### Project Structure
@@ -309,11 +327,19 @@ LOG_LEVEL=INFO
    - Verify APScheduler table permissions
 
 3. **WhatsApp Messages Not Sending**
-   - Verify Twilio Account SID and Auth Token
-   - Check Twilio WhatsApp sandbox configuration
-   - Ensure phone numbers are in correct format (with country codes)
-   - Check webhook configuration in Twilio Console
-   - Review message logs and Twilio error codes
+   - **Sandbox Issues**:
+     - Users must first send `join depend-wheat` to `whatsapp:+14155238886`
+     - Check application logs for sandbox detection warnings
+     - Verify phone number format (with country codes)
+   - **Production Issues**:
+     - Messages outside 24-hour session window require template messages
+     - Verify template SIDs are configured and approved
+     - Check user opt-in status and consent
+   - **General Troubleshooting**:
+     - Verify Twilio Account SID and Auth Token
+     - Check webhook configuration in Twilio Console
+     - Review Twilio error codes in application logs
+     - Ensure sufficient Twilio account balance
 
 4. **AI Summarization Failing**
    - Verify OpenRouter API key

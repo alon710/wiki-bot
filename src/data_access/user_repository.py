@@ -47,6 +47,7 @@ class UserRepository:
                         phone=user_from_db.phone,
                         language=user_from_db.language,
                         subscribed=user_from_db.subscribed,
+                        last_message_at=user_from_db.last_message_at,
                         created_at=user_from_db.created_at,
                         updated_at=user_from_db.updated_at
                     )
@@ -157,6 +158,27 @@ class UserRepository:
         except Exception as e:
             logger.error("Failed to delete user", phone=phone, error=str(e))
             raise
+    
+    def update_last_message(self, phone: str) -> bool:
+        """Update user's last message timestamp."""
+        try:
+            def update_timestamp_operation(session):
+                statement = select(User).where(User.phone == phone)
+                user = session.exec(statement).first()
+                
+                if user:
+                    user.last_message_at = datetime.now(timezone.utc)
+                    session.add(user)
+                    session.commit()
+                    logger.debug("User last message timestamp updated", phone=phone)
+                    return True
+                return False
+                
+            return database_client.execute_with_retry_manual_commit(update_timestamp_operation)
+            
+        except Exception as e:
+            logger.error("Failed to update last message timestamp", phone=phone, error=str(e))
+            return False
 
 
 # Global repository instance

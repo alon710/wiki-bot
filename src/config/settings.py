@@ -47,6 +47,14 @@ class TwilioSettings(BaseSettings):
         alias="TWILIO_BASE_URL", default="https://localhost:8000"
     )
 
+    # Template message SIDs for WhatsApp Business API
+    welcome_template_sid: str = Field(alias="TWILIO_WELCOME_TEMPLATE_SID", default="")
+    menu_template_sid: str = Field(alias="TWILIO_MENU_TEMPLATE_SID", default="")
+    subscription_template_sid: str = Field(
+        alias="TWILIO_SUBSCRIPTION_TEMPLATE_SID", default=""
+    )
+    language_template_sid: str = Field(alias="TWILIO_LANGUAGE_TEMPLATE_SID", default="")
+
     @property
     def webhook_url(self) -> str:
         """Generate the webhook URL dynamically."""
@@ -56,6 +64,16 @@ class TwilioSettings(BaseSettings):
     def status_callback_url(self) -> str:
         """Generate the status callback URL dynamically."""
         return f"{str(self.base_url).rstrip('/')}/webhook/whatsapp/status"
+
+    @property
+    def is_sandbox(self) -> bool:
+        """Check if using Twilio WhatsApp Sandbox."""
+        return self.whatsapp_from == "whatsapp:+14155238886"
+
+    @property
+    def has_templates(self) -> bool:
+        """Check if template SIDs are configured."""
+        return bool(self.welcome_template_sid and self.menu_template_sid)
 
 
 class OpenRouterSettings(BaseSettings):
