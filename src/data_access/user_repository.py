@@ -32,16 +32,18 @@ class UserRepository:
     def get_user_by_phone(self, phone: str) -> Optional[User]:
         """Get user by phone number."""
         try:
-            with database_client.get_session() as session:
+            def get_user_operation(session):
                 statement = select(User).where(User.phone == phone)
-                user = session.exec(statement).first()
+                return session.exec(statement).first()
                 
-                if user:
-                    logger.debug("User found", phone=phone)
-                else:
-                    logger.debug("User not found", phone=phone)
-                
-                return user
+            user = database_client.execute_with_retry(get_user_operation)
+            
+            if user:
+                logger.debug("User found", phone=phone)
+            else:
+                logger.debug("User not found", phone=phone)
+            
+            return user
                 
         except Exception as e:
             logger.error("Failed to get user by phone", phone=phone, error=str(e))
@@ -50,7 +52,7 @@ class UserRepository:
     def update_user(self, phone: str, user_data: UserUpdate) -> Optional[User]:
         """Update user preferences."""
         try:
-            with database_client.get_session() as session:
+            def update_user_operation(session):
                 statement = select(User).where(User.phone == phone)
                 user = session.exec(statement).first()
                 
@@ -71,6 +73,8 @@ class UserRepository:
                 logger.info("User updated successfully", phone=phone, updated_fields=list(update_data.keys()))
                 return user
                 
+            return database_client.execute_with_retry(update_user_operation)
+                
         except Exception as e:
             logger.error("Failed to update user", phone=phone, error=str(e))
             raise
@@ -78,15 +82,16 @@ class UserRepository:
     def get_subscribed_users_by_language(self, language: Language) -> List[User]:
         """Get all subscribed users for a specific language."""
         try:
-            with database_client.get_session() as session:
+            def get_users_operation(session):
                 statement = select(User).where(
                     User.subscribed,
                     User.language == language
                 )
-                users = session.exec(statement).all()
+                return session.exec(statement).all()
                 
-                logger.info("Retrieved subscribed users", language=language, count=len(users))
-                return users
+            users = database_client.execute_with_retry(get_users_operation)
+            logger.info("Retrieved subscribed users", language=language, count=len(users))
+            return users
                 
         except Exception as e:
             logger.error("Failed to get subscribed users", language=language, error=str(e))
@@ -95,12 +100,13 @@ class UserRepository:
     def get_all_subscribed_users(self) -> List[User]:
         """Get all subscribed users."""
         try:
-            with database_client.get_session() as session:
+            def get_all_users_operation(session):
                 statement = select(User).where(User.subscribed)
-                users = session.exec(statement).all()
+                return session.exec(statement).all()
                 
-                logger.info("Retrieved all subscribed users", count=len(users))
-                return users
+            users = database_client.execute_with_retry(get_all_users_operation)
+            logger.info("Retrieved all subscribed users", count=len(users))
+            return users
                 
         except Exception as e:
             logger.error("Failed to get all subscribed users", error=str(e))

@@ -2,6 +2,8 @@ from sqlalchemy import create_engine
 from sqlmodel import Session, text
 from typing import Optional, Generator
 from contextlib import contextmanager
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from sqlalchemy.exc import OperationalError, DisconnectionError
 
 from src.config.settings import settings
 from src.utils.logger import get_logger
@@ -40,6 +42,15 @@ class DatabaseClient:
                 echo=settings.database.echo,
                 pool_size=settings.database.pool_size,
                 max_overflow=settings.database.max_overflow,
+                # Connection pool settings for better reliability
+                pool_pre_ping=True,  # Verify connections before use
+                pool_recycle=3600,   # Recycle connections every hour
+                # SSL and connection settings for PostgreSQL
+                connect_args={
+                    "sslmode": "prefer",
+                    "connect_timeout": 10,
+                    "application_name": "WikiBot"
+                } if "postgresql" in database_url else {}
             )
 
             self._session_factory = lambda: Session(
@@ -74,18 +85,34 @@ class DatabaseClient:
         try:
             yield session
             session.commit()
+        except (OperationalError, DisconnectionError) as e:
+            logger.warning("Database connection error, session will be rolled back", error=str(e))
+            session.rollback()
+            raise
         except Exception:
             session.rollback()
             raise
         finally:
             session.close()
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        retry=retry_if_exception_type((OperationalError, DisconnectionError))
+    )
+    def execute_with_retry(self, operation):
+        """Execute a database operation with automatic retry on connection failures."""
+        with self.get_session() as session:
+            return operation(session)
+
     def health_check(self) -> bool:
         """Check if database connection is healthy."""
         try:
-            with self.get_session() as session:
-                session.execute(text("SELECT 1"))  # Corrected line
-            return True
+            def check_operation(session):
+                session.exec(text("SELECT 1"))
+                return True
+                
+            return self.execute_with_retry(check_operation)
         except Exception as e:
             logger.error("Database health check failed", error=str(e))
             return False
