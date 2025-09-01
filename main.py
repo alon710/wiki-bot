@@ -9,6 +9,7 @@ in English and Hebrew using AI summarization and cost-optimized distribution.
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 # Import all models to ensure they're registered with SQLModel metadata
 from src.models import user, fact, message  # noqa
@@ -93,8 +94,6 @@ def create_app() -> FastAPI:
         description="A WhatsApp bot that sends daily Wikipedia facts in English and Hebrew",
         version="1.0.0",
         lifespan=lifespan,
-        docs_url="/docs" if settings.env_id != "production" else None,
-        redoc_url="/redoc" if settings.env_id != "production" else None,
     )
 
     # Add middleware
@@ -124,14 +123,7 @@ app = create_app()
 
 @app.get("/", include_in_schema=False)
 async def root():
-    """Root endpoint with basic information."""
-    return {
-        "name": "WikiBot",
-        "description": "Wikipedia Facts WhatsApp Bot",
-        "version": "1.0.0",
-        "status": "running",
-        "environment": settings.env_id.value,
-    }
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health", include_in_schema=False)

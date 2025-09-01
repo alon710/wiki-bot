@@ -3,6 +3,7 @@ from enum import Enum
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AnyHttpUrl
 
 ENV_FILE = Path(__file__).parent.parent.parent / ".env"
 
@@ -42,6 +43,19 @@ class TwilioSettings(BaseSettings):
     auth_token: str = Field(alias="TWILIO_AUTH_TOKEN")
     whatsapp_from: str = Field(alias="TWILIO_WHATSAPP_FROM")
     webhook_verify_token: str = Field(alias="TWILIO_WEBHOOK_VERIFY_TOKEN", default="")
+    base_url: AnyHttpUrl = Field(
+        alias="TWILIO_BASE_URL", default="https://localhost:8000"
+    )
+
+    @property
+    def webhook_url(self) -> str:
+        """Generate the webhook URL dynamically."""
+        return f"{str(self.base_url).rstrip('/')}/webhook/whatsapp"
+
+    @property
+    def status_callback_url(self) -> str:
+        """Generate the status callback URL dynamically."""
+        return f"{str(self.base_url).rstrip('/')}/webhook/whatsapp/status"
 
 
 class OpenRouterSettings(BaseSettings):

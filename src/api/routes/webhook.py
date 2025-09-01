@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Form
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from src.config.settings import Language
 from src.models.message import WhatsAppWebhookMessage
@@ -15,56 +15,53 @@ router = APIRouter()
 
 
 @router.post("/webhook/whatsapp")
-async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
+async def whatsapp_webhook(
+    background_tasks: BackgroundTasks,
+    From: str = Form(...),
+    Body: str = Form(...),
+    MessageSid: str = Form(...),
+    To: str = Form(...)
+):
     """
-    Handle incoming WhatsApp webhook messages.
+    Handle incoming WhatsApp webhook messages from Twilio.
     
     This endpoint receives messages from WhatsApp users and processes commands.
+    Twilio sends webhook data as form-encoded data, not JSON.
     """
     try:
-        # Get the raw request body
-        body = await request.json()
-        
         # Log incoming webhook for debugging
-        logger.info("Received WhatsApp webhook", body=body)
-        
-        # Extract message data from Twilio webhook
-        # Twilio sends data directly in the body, not nested in "messages" array
-        
-        # Required Twilio webhook fields
-        from_phone = body.get("From", "")
-        message_body = body.get("Body", "").strip()
-        message_id = body.get("MessageSid", "")
-        to_phone = body.get("To", "")
+        logger.info("Received WhatsApp webhook", 
+                   from_phone=From, 
+                   body=Body, 
+                   message_sid=MessageSid)
         
         # Remove 'whatsapp:' prefix from phone numbers if present
-        if from_phone.startswith("whatsapp:"):
-            from_phone = from_phone[9:]  # Remove 'whatsapp:' prefix
-        if to_phone.startswith("whatsapp:"):
-            to_phone = to_phone[9:]  # Remove 'whatsapp:' prefix
+        from_phone = From[9:] if From.startswith("whatsapp:") else From
+        message_body = Body.strip()
         
         if not from_phone or not message_body:
             logger.warning("Missing required message fields", 
                          from_phone=from_phone, 
                          message_body=message_body)
-            return JSONResponse({"status": "error", "message": "Missing required fields"})
+            return PlainTextResponse("", status_code=400)
         
         # Create webhook message model
         webhook_message = WhatsAppWebhookMessage(
             from_=from_phone,
             body=message_body,
             timestamp=datetime.now(timezone.utc),
-            message_id=message_id
+            message_id=MessageSid
         )
         
         # Process message in background
         background_tasks.add_task(process_whatsapp_message, webhook_message)
         
-        return JSONResponse({"status": "ok"})
+        # Return empty response as expected by Twilio
+        return PlainTextResponse("", status_code=200)
         
     except Exception as e:
         logger.error("Failed to process WhatsApp webhook", error=str(e))
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return PlainTextResponse("", status_code=500)
 
 
 async def process_whatsapp_message(message: WhatsAppWebhookMessage):
@@ -190,7 +187,7 @@ async def handle_command(user, command: str):
 
 
 @router.get("/webhook/whatsapp")
-async def whatsapp_webhook_verification(request: Request):
+async def whatsapp_webhook_verification():
     """
     Handle Twilio WhatsApp webhook verification.
     
@@ -208,3 +205,39 @@ async def whatsapp_webhook_verification(request: Request):
     except Exception as e:
         logger.error("Twilio WhatsApp webhook verification failed", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/webhook/whatsapp/status")
+async def whatsapp_status_callback(
+    MessageSid: str = Form(...),
+    MessageStatus: str = Form(...),
+    To: str = Form(...),
+    From: str = Form(...)
+):
+    """
+    Handle Twilio WhatsApp message status callbacks.
+    
+    This endpoint receives delivery status updates for sent messages.
+    Status values: queued, sent, delivered, read, failed, undelivered
+    """
+    try:
+        # Remove 'whatsapp:' prefix from phone numbers
+        to_phone = To[9:] if To.startswith("whatsapp:") else To
+        from_phone = From[9:] if From.startswith("whatsapp:") else From
+        
+        logger.info("WhatsApp message status update",
+                   message_sid=MessageSid,
+                   status=MessageStatus,
+                   to_phone=to_phone,
+                   from_phone=from_phone)
+        
+        # Here you could update the message status in your database
+        # For now, we'll just log the status update
+        
+        return PlainTextResponse("", status_code=200)
+        
+    except Exception as e:
+        logger.error("Failed to process status callback", 
+                    message_sid=MessageSid,
+                    error=str(e))
+        return PlainTextResponse("", status_code=500)
