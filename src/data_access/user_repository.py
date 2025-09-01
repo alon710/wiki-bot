@@ -35,20 +35,43 @@ class UserRepository:
         """Get user by phone number."""
         try:
             def get_user_operation(session):
+                logger.debug("Executing user lookup query", phone=phone)
                 statement = select(User).where(User.phone == phone)
-                return session.exec(statement).first()
+                user_from_db = session.exec(statement).first()
+                logger.debug("User lookup query completed", phone=phone, found=user_from_db is not None)
+                
+                if user_from_db:
+                    # Create a detached copy to avoid session binding issues
+                    user_copy = User(
+                        id=user_from_db.id,
+                        phone=user_from_db.phone,
+                        language=user_from_db.language,
+                        subscribed=user_from_db.subscribed,
+                        created_at=user_from_db.created_at,
+                        updated_at=user_from_db.updated_at
+                    )
+                    logger.debug("Created detached user copy", phone=phone, user_id=user_copy.id)
+                    return user_copy
+                return None
                 
             user = database_client.execute_with_retry(get_user_operation)
             
             if user:
-                logger.debug("User found", phone=phone)
+                logger.debug("User found", 
+                           phone=phone, 
+                           user_id=user.id,
+                           language=user.language,
+                           subscribed=user.subscribed)
             else:
                 logger.debug("User not found", phone=phone)
             
             return user
                 
         except Exception as e:
-            logger.error("Failed to get user by phone", phone=phone, error=str(e))
+            logger.error("Failed to get user by phone", 
+                        phone=phone, 
+                        error=str(e),
+                        error_type=type(e).__name__)
             raise
     
     def update_user(self, phone: str, user_data: UserUpdate) -> Optional[User]:

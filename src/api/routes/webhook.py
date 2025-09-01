@@ -18,7 +18,7 @@ router = APIRouter()
 async def whatsapp_webhook(
     background_tasks: BackgroundTasks,
     From: str = Form(...),
-    Body: str = Form(...),
+    Body: str = Form(None),
     MessageSid: str = Form(...),
     To: str = Form(...)
 ):
@@ -37,12 +37,10 @@ async def whatsapp_webhook(
         
         # Remove 'whatsapp:' prefix from phone numbers if present
         from_phone = From[9:] if From.startswith("whatsapp:") else From
-        message_body = Body.strip()
+        message_body = Body.strip() if Body else ""
         
-        if not from_phone or not message_body:
-            logger.warning("Missing required message fields", 
-                         from_phone=from_phone, 
-                         message_body=message_body)
+        if not from_phone:
+            logger.warning("Missing required phone field", from_phone=from_phone)
             return PlainTextResponse("", status_code=400)
         
         # Create webhook message model
@@ -82,83 +80,138 @@ async def process_whatsapp_message(message: WhatsAppWebhookMessage):
         
         # Get or create user
         user = user_repository.get_user_by_phone(phone)
+        logger.debug("User lookup completed", 
+                    phone=phone, 
+                    user_found=user is not None,
+                    user_id=user.id if user else None)
+        
         if not user:
             # New user - create with default settings
             user_data = UserCreate(phone=phone, language=Language.ENGLISH)
             user = user_repository.create_user(user_data)
             
-            # Send welcome message
-            await whatsapp_service.send_welcome_message(phone, user.language)
+            logger.debug("New user created", 
+                        phone=phone, 
+                        user_id=user.id,
+                        user_language=user.language)
             
-            logger.info("New user created and welcomed", phone=phone)
+            # Send main menu for new users
+            await whatsapp_service.send_main_menu(phone, user.language)
+            
+            logger.info("New user created and main menu sent", phone=phone)
             return
         
-        # Process commands
-        if body.startswith('/'):
-            await handle_command(user, body)
+        # Process number responses or show main menu for any text message
+        if body and body.strip().isdigit():
+            await handle_number_response(phone, body.strip())
         else:
-            # Non-command message - send help
-            await whatsapp_service.send_help_message(phone, user.language)
+            # Any non-number message should get main menu
+            await whatsapp_service.send_main_menu(phone, user.language)
         
     except Exception as e:
         logger.error("Failed to process WhatsApp message",
                     phone=message.from_,
                     body=message.body,
-                    error=str(e))
+                    message_id=message.message_id,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    error_module=getattr(e, '__module__', 'unknown'))
 
 
-async def handle_command(user, command: str):
+async def handle_number_response(phone: str, number: str):
     """
-    Handle WhatsApp commands.
+    Handle WhatsApp number responses.
     
     Args:
-        user: User object
-        command: Command string (e.g., '/start', '/stop')
+        phone: User phone number
+        number: Number sent by user (1, 2, 3, etc.)
     """
     try:
-        phone = user.phone
+        logger.debug("Processing number response", phone=phone, number=number)
+        
+        # Get fresh user data to avoid session issues
+        user = user_repository.get_user_by_phone(phone)
+        if not user:
+            logger.warning("User not found for number processing", phone=phone)
+            return
+            
+        current_language = user.language
+        logger.debug("User data retrieved for number", 
+                    phone=phone, 
+                    language=current_language, 
+                    subscribed=user.subscribed)
+        
+        # Main menu responses
+        if number == "1":
+            # Get Daily Fact - for now send help until we implement fact fetching
+            await whatsapp_service.send_help_message(phone, current_language)
+            
+        elif number == "2":
+            # Manage Subscription - show subscription menu
+            await whatsapp_service.send_subscription_menu(phone, current_language, user.subscribed)
+            
+        elif number == "3":
+            # Change Language - show language menu
+            await whatsapp_service.send_language_menu(phone, current_language)
+            
+        elif number == "4":
+            # Help
+            await whatsapp_service.send_help_message(phone, current_language)
+            
+        elif number == "0":
+            # Back to main menu
+            await whatsapp_service.send_main_menu(phone, current_language)
+            
+        else:
+            # Handle subscription and language menu responses
+            await handle_sub_menu_response(phone, number, user)
+        
+        logger.info("Number response processed successfully",
+                   phone=phone,
+                   number=number)
+        
+    except Exception as e:
+        logger.error("Failed to handle number response",
+                    phone=phone,
+                    number=number,
+                    error=str(e),
+                    error_type=type(e).__name__)
+
+
+async def handle_sub_menu_response(phone: str, number: str, user):
+    """Handle responses in subscription and language sub-menus."""
+    try:
         current_language = user.language
         
-        if command in ['/start', '/subscribe']:
-            # Start receiving daily facts
-            if not user.subscribed:
-                user_update = UserUpdate(subscribed=True)
-                user_repository.update_user(phone, user_update)
-            
-            await whatsapp_service.send_subscription_changed_message(
-                phone, True, current_language
-            )
-            
-        elif command in ['/stop', '/unsubscribe']:
-            # Stop receiving daily facts
+        # This could be subscription menu (1=subscribe/unsubscribe, 0=back)
+        # or language menu (1=English, 2=Hebrew, 0=back)
+        
+        if number == "1":
+            # Check if we're in subscription context or language context
+            # For now, assume it's subscription toggle
             if user.subscribed:
+                # Unsubscribe
                 user_update = UserUpdate(subscribed=False)
                 user_repository.update_user(phone, user_update)
-            
-            await whatsapp_service.send_subscription_changed_message(
-                phone, False, current_language
-            )
-            
-        elif command in ['/english', '/en']:
-            # Change language to English
-            if current_language != Language.ENGLISH:
-                user_update = UserUpdate(language=Language.ENGLISH)
-                user_repository.update_user(phone, user_update)
-                
-                await whatsapp_service.send_language_changed_message(
-                    phone, Language.ENGLISH
+                logger.debug("User subscription updated", phone=phone, subscribed=False)
+                await whatsapp_service.send_subscription_changed_message(
+                    phone, False, current_language
                 )
             else:
-                await whatsapp_service.send_language_changed_message(
-                    phone, Language.ENGLISH
+                # Subscribe  
+                user_update = UserUpdate(subscribed=True)
+                user_repository.update_user(phone, user_update)
+                logger.debug("User subscription updated", phone=phone, subscribed=True)
+                await whatsapp_service.send_subscription_changed_message(
+                    phone, True, current_language
                 )
-        
-        elif command in ['/hebrew', '/he', '/עברית']:
-            # Change language to Hebrew
+                
+        elif number == "2":
+            # Language menu: Hebrew
             if current_language != Language.HEBREW:
                 user_update = UserUpdate(language=Language.HEBREW)
                 user_repository.update_user(phone, user_update)
-                
+                logger.debug("User language updated", phone=phone, language="Hebrew")
                 await whatsapp_service.send_language_changed_message(
                     phone, Language.HEBREW
                 )
@@ -166,24 +219,16 @@ async def handle_command(user, command: str):
                 await whatsapp_service.send_language_changed_message(
                     phone, Language.HEBREW
                 )
-        
-        elif command in ['/help', '/h']:
-            # Send help message
-            await whatsapp_service.send_help_message(phone, current_language)
-        
         else:
-            # Unknown command
-            await whatsapp_service.send_error_message(phone, current_language)
-        
-        logger.info("Command processed successfully",
-                   phone=phone,
-                   command=command)
-        
+            # Unknown number - show main menu
+            await whatsapp_service.send_main_menu(phone, current_language)
+            
     except Exception as e:
-        logger.error("Failed to handle command",
-                    phone=user.phone,
-                    command=command,
-                    error=str(e))
+        logger.error("Failed to handle sub menu response",
+                    phone=phone,
+                    number=number,
+                    error=str(e),
+                    error_type=type(e).__name__)
 
 
 @router.get("/webhook/whatsapp")

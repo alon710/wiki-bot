@@ -378,6 +378,158 @@ class WhatsAppService:
         
         return results
     
+    async def send_main_menu(self, phone: str, language: Language) -> bool:
+        """
+        Send main menu with text options.
+        
+        Args:
+            phone: User's phone number
+            language: User's language preference
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if language == Language.HEBREW:
+                content = (
+                    "🤖 בוט עובדות ויקיפדיה\n\n"
+                    "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
+                    "1️⃣ קבל עובדה יומית\n"
+                    "2️⃣ ניהול מנוי\n"
+                    "3️⃣ שנה שפה\n"
+                    "4️⃣ עזרה"
+                )
+            else:
+                content = (
+                    "🤖 Wikipedia Facts Bot\n\n"
+                    "Choose an action by sending the corresponding number:\n\n"
+                    "1️⃣ Get Daily Fact\n"
+                    "2️⃣ Manage Subscription\n"
+                    "3️⃣ Change Language\n"
+                    "4️⃣ Help"
+                )
+            
+            message_id = await self.send_message(
+                phone=phone,
+                content=content,
+                message_type=MessageType.WELCOME
+            )
+            
+            return message_id is not None
+            
+        except Exception as e:
+            logger.error("Failed to send main menu",
+                        phone=phone,
+                        language=language,
+                        error=str(e))
+            return False
+    
+    async def send_subscription_menu(self, phone: str, language: Language, current_status: bool) -> bool:
+        """
+        Send subscription management menu.
+        
+        Args:
+            phone: User's phone number
+            language: User's language preference
+            current_status: Current subscription status
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if language == Language.HEBREW:
+                if current_status:
+                    content = (
+                        "📬 ניהול מנוי\n\n"
+                        "אתה כרגע מנוי לעובדות יומיות.\n"
+                        "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
+                        "1️⃣ בטל מנוי\n"
+                        "0️⃣ חזור לתפריט הראשי"
+                    )
+                else:
+                    content = (
+                        "📬 ניהול מנוי\n\n"
+                        "אתה כרגע לא מנוי לעובדות יומיות.\n"
+                        "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
+                        "1️⃣ הרשם למנוי\n"
+                        "0️⃣ חזור לתפריט הראשי"
+                    )
+            else:
+                if current_status:
+                    content = (
+                        "📬 Subscription Management\n\n"
+                        "You are currently subscribed to daily facts.\n"
+                        "Choose an action by sending the corresponding number:\n\n"
+                        "1️⃣ Unsubscribe\n"
+                        "0️⃣ Back to Main Menu"
+                    )
+                else:
+                    content = (
+                        "📬 Subscription Management\n\n"
+                        "You are currently not subscribed to daily facts.\n"
+                        "Choose an action by sending the corresponding number:\n\n"
+                        "1️⃣ Subscribe\n"
+                        "0️⃣ Back to Main Menu"
+                    )
+            
+            message_id = await self.send_message(
+                phone=phone,
+                content=content,
+                message_type=MessageType.SUBSCRIPTION_CHANGED
+            )
+            
+            return message_id is not None
+            
+        except Exception as e:
+            logger.error("Failed to send subscription menu",
+                        phone=phone,
+                        language=language,
+                        error=str(e))
+            return False
+    
+    async def send_language_menu(self, phone: str, current_language: Language) -> bool:
+        """
+        Send language selection menu.
+        
+        Args:
+            phone: User's phone number
+            current_language: Current language preference
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if current_language == Language.HEBREW:
+                content = (
+                    "🌍 בחירת שפה\n\n"
+                    "בחר את השפה המועדפת עליך על ידי שליחת המספר המתאים:\n\n"
+                    "1️⃣ English\n"
+                    "2️⃣ עברית\n"
+                    "0️⃣ חזור לתפריט הראשי"
+                )
+            else:
+                content = (
+                    "🌍 Language Selection\n\n"
+                    "Choose your preferred language by sending the corresponding number:\n\n"
+                    "1️⃣ English\n"
+                    "2️⃣ עברית (Hebrew)\n"
+                    "0️⃣ Back to Main Menu"
+                )
+            
+            message_id = await self.send_message(
+                phone=phone,
+                content=content,
+                message_type=MessageType.LANGUAGE_CHANGED
+            )
+            
+            return message_id is not None
+            
+        except Exception as e:
+            logger.error("Failed to send language menu",
+                        phone=phone,
+                        current_language=current_language,
+                        error=str(e))
+            return False
 
 
 # Global service instance

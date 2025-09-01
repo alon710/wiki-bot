@@ -15,7 +15,7 @@ from fastapi.responses import RedirectResponse
 from src.models import user, fact, message  # noqa
 
 from src.config.settings import settings
-from src.api.routes import webhook, admin
+from src.api.routes import webhook
 from src.api.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from src.services.scheduler_service import scheduler_service
 from src.data_access.database_client import database_client
@@ -112,7 +112,6 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(webhook.router, tags=["Webhooks"])
-    app.include_router(admin.router, tags=["Admin"])
 
     return app
 

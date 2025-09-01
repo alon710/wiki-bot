@@ -10,7 +10,7 @@ A cost-optimized WhatsApp bot that sends daily Wikipedia facts in English and He
 - 📅 **Scheduled Distribution**: Daily facts sent at configurable time using APScheduler
 - 🗄️ **PostgreSQL Database**: SQLModel-based data persistence with proper indexing
 - 🔒 **Secure**: Structured logging, environment-based configuration, and security headers
-- 📊 **Admin Dashboard**: Health checks, statistics, and manual controls
+- 📱 **Forms-Based Interface**: Simple numbered menus for easy user interaction
 
 ## Architecture
 
@@ -131,21 +131,31 @@ Or with uvicorn directly:
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### WhatsApp Commands
+### WhatsApp Interaction
 
-Users can interact with the bot using these commands:
-- `/start` or `/subscribe` - Subscribe to daily facts
-- `/stop` or `/unsubscribe` - Unsubscribe from daily facts  
-- `/english` or `/en` - Switch to English facts
-- `/hebrew` or `/he` or `/עברית` - Switch to Hebrew facts
-- `/help` or `/h` - Show help message
+Users interact with the bot through numbered menu options instead of text commands. The bot presents simple menus that users navigate by sending numbers:
 
-### Admin Endpoints
+**Main Menu (sent to new users and for any non-number message):**
+- `1` - Get Daily Fact (currently shows help)
+- `2` - Manage Subscription  
+- `3` - Change Language
+- `4` - Help
 
-- `GET /` - Basic application info
-- `GET /health` - Simple health check
-- `GET /admin/health` - Comprehensive health check with all service status
-- `GET /admin/stats` - System statistics (users, facts, scheduler status)
+**Subscription Management Menu:**
+- `1` - Subscribe/Unsubscribe (toggles current status)
+- `0` - Back to Main Menu
+
+**Language Selection Menu:**
+- `1` - English
+- `2` - עברית (Hebrew)
+- `0` - Back to Main Menu
+
+This forms-based approach ensures users always have clear options and never need to remember text commands.
+
+### Health Check Endpoints
+
+- `GET /` - Redirects to API documentation
+- `GET /health` - Simple health check with database status
 
 ### Webhook Setup
 
@@ -221,6 +231,7 @@ logger.info(f"User {user.phone} created with language {user.language}")
 3. **Smart Caching**: Store generated facts to avoid re-generation
 4. **Efficient Scheduling**: Off-peak generation times
 5. **API Rate Limiting**: Respectful API usage patterns
+6. **Forms-Based Interface**: Simple numbered menus reduce complexity and eliminate command parsing overhead
 
 ## Testing
 
@@ -279,9 +290,8 @@ LOG_LEVEL=INFO
 
 ## Monitoring
 
-- Health checks: `/health` and `/admin/health`
+- Health checks: `/health`
 - Structured logs for monitoring systems
-- Scheduler job monitoring via `/admin/jobs`
 - Database connection monitoring
 - API service health checks
 
