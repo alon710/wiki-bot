@@ -72,7 +72,7 @@ class TwilioSettings(BaseSettings):
     @property
     def has_templates(self) -> bool:
         """Check if template SIDs are configured."""
-        return bool(self.welcome_template_sid and self.menu_template_sid)
+        return bool(self.daily_fact_template_sid and self.menu_template_sid)
 
 
 class OpenRouterSettings(BaseSettings):
