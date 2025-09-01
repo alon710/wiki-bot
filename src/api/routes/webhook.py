@@ -80,19 +80,11 @@ async def process_whatsapp_message(message: WhatsAppWebhookMessage):
         
         # Get or create user
         user = user_repository.get_user_by_phone(phone)
-        logger.debug("User lookup completed", 
-                    phone=phone, 
-                    user_found=user is not None,
-                    user_id=user.id if user else None)
         
         if not user:
             # New user - create with default settings
             user_data = UserCreate(phone=phone)
             user = user_repository.create_user(user_data)
-            
-            logger.debug("New user created", 
-                        phone=phone, 
-                        user_id=user.id)
             
             # Send welcome message for new users
             await whatsapp_service.send_welcome_message(phone, user)
@@ -129,17 +121,11 @@ async def handle_number_response(phone: str, number: str):
         number: Number sent by user (1, 2, 3, etc.)
     """
     try:
-        logger.debug("Processing number response", phone=phone, number=number)
-        
         # Get fresh user data to avoid session issues
         user = user_repository.get_user_by_phone(phone)
         if not user:
             logger.warning("User not found for number processing", phone=phone)
             return
-            
-        logger.debug("User data retrieved for number", 
-                    phone=phone, 
-                    subscribed=user.subscribed)
         
         # Main menu responses
         if number == "1":
@@ -177,13 +163,11 @@ async def handle_subscription_toggle(phone: str, user):
             # Unsubscribe
             user_update = UserUpdate(subscribed=False)
             user_repository.update_user(phone, user_update)
-            logger.debug("User subscription updated", phone=phone, subscribed=False)
             await whatsapp_service.send_subscription_changed_message(phone, False)
         else:
             # Subscribe  
             user_update = UserUpdate(subscribed=True)
             user_repository.update_user(phone, user_update)
-            logger.debug("User subscription updated", phone=phone, subscribed=True)
             await whatsapp_service.send_subscription_changed_message(phone, True)
             
     except Exception as e:

@@ -69,15 +69,15 @@ class WhatsAppService:
         # Basic template variables - customize per message type
         variables = {"1": content}
         
-        # Add user-specific variables if available
-        if user:
-            variables["2"] = user.phone  # Can be used for personalization
-        
         # Message type specific variables
         if message_type == MessageType.DAILY_FACT:
-            variables["3"] = "ויקיפדיה"  # Source
+            variables["2"] = "ויקיפדיה"  # Source
+            if user:
+                variables["3"] = user.phone  # Can be used for personalization
         elif message_type == MessageType.WELCOME:
             variables["2"] = "09:00 UTC"  # Delivery time
+        elif user:
+            variables["2"] = user.phone  # Can be used for personalization
         
         return json.dumps(variables)
 
@@ -111,17 +111,24 @@ class WhatsAppService:
                 and not settings.twilio.is_sandbox
                 and settings.twilio.has_templates
             ):
-                should_use_template = True
                 template_sid = self._get_template_sid(message_type)
-                template_variables = self._format_template_variables(
-                    message_type, content, user
-                )
-                logger.info(
-                    "User outside session window, using template message",
-                    phone=phone,
-                    template_sid=template_sid,
-                    last_message_at=user.last_message_at,
-                )
+                if template_sid:
+                    should_use_template = True
+                    template_variables = self._format_template_variables(
+                        message_type, content, user
+                    )
+                    logger.info(
+                        "User outside session window, using template message",
+                        phone=phone,
+                        template_sid=template_sid,
+                        last_message_at=user.last_message_at,
+                    )
+                else:
+                    logger.warning(
+                        "Template required but not available, falling back to regular message",
+                        phone=phone,
+                        message_type=message_type,
+                    )
 
             if should_use_template and template_sid:
                 response = self.client.messages.create(
@@ -137,14 +144,25 @@ class WhatsAppService:
 
             external_id = response.sid if response else None
 
-            logger.info(
-                "WhatsApp message sent successfully",
-                phone=phone,
-                message_type=message_type,
-                external_id=external_id,
-                sandbox=settings.twilio.is_sandbox,
-                should_use_template=should_use_template,
-            )
+            # Verify the response and log details
+            if external_id:
+                logger.info(
+                    "WhatsApp message sent successfully",
+                    phone=phone,
+                    message_type=message_type,
+                    external_id=external_id,
+                    sandbox=settings.twilio.is_sandbox,
+                    should_use_template=should_use_template,
+                    response_status=getattr(response, 'status', 'unknown'),
+                )
+            else:
+                logger.warning(
+                    "WhatsApp message sent but no SID received",
+                    phone=phone,
+                    message_type=message_type,
+                    sandbox=settings.twilio.is_sandbox,
+                    should_use_template=should_use_template,
+                )
 
             return external_id
 
@@ -156,6 +174,8 @@ class WhatsAppService:
                 error_code=getattr(e, "code", None),
                 error_message=str(e),
                 sandbox=settings.twilio.is_sandbox,
+                should_use_template=should_use_template,
+                template_sid=template_sid,
             )
             return None
         except Exception as e:
@@ -164,7 +184,9 @@ class WhatsAppService:
                 phone=phone,
                 message_type=message_type,
                 error=str(e),
+                error_type=type(e).__name__,
                 sandbox=settings.twilio.is_sandbox,
+                should_use_template=should_use_template,
             )
             return None
 
@@ -188,6 +210,7 @@ class WhatsAppService:
                 phone=user.phone,
                 content=formatted_message,
                 message_type=MessageType.DAILY_FACT,
+                user=user,
             )
 
             return message_id is not None
@@ -322,7 +345,7 @@ class WhatsAppService:
             content = "❓ אנא בחר מספר מהתפריט:\n\n1️⃣ עובדה יומית\n2️⃣ הפסק מנוי\n3️⃣ עזרה"
 
             message_id = await self.send_message(
-                phone=phone, content=content, message_type=MessageType.ERROR
+                phone=phone, content=content, message_type=MessageType.ERROR, user=user
             )
 
             return message_id is not None
