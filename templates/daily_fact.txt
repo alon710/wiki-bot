@@ -1,0 +1,22 @@
+Template Name: daily_fact
+Content Type: Standard
+Message Type: MessageType.DAILY_FACT
+Variables: {{1}} (fact content - USED), {{2}} (user phone - optional)
+Environment Variable: TWILIO_DAILY_FACT_TEMPLATE_SID
+
+=== TEMPLATE CONTENT (copy to Twilio Console) ===
+
+🧠 עובדה יומית מרתקת:
+
+{{1}}
+
+📚 מקור: ויקיפדיה
+
+=== END TEMPLATE CONTENT ===
+
+Notes:
+- Sent for daily fact broadcasts
+- Variable {{1}} receives the actual Wikipedia fact content (IMPORTANT: this variable IS used)
+- Variable {{2}} receives user phone number but is not displayed
+- This is the only template that actually uses variable {{1}} for dynamic content
+- Fact content comes from Wikipedia API and AI summarization

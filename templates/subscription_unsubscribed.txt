@@ -1,0 +1,20 @@
+Template Name: subscription_unsubscribed
+Content Type: Standard
+Message Type: MessageType.SUBSCRIPTION_CHANGED (subscribed=false)
+Variables: {{1}} (content key - not used), {{2}} (user phone - optional)
+Environment Variable: TWILIO_SUBSCRIPTION_TEMPLATE_SID (same template, different content based on code logic)
+
+=== TEMPLATE CONTENT (copy to Twilio Console) ===
+
+❌ המנוי בוטל בהצלחה. לא תקבל יותר עובדות יומיות.
+
+כדי להתחיל שוב, שלח כל הודעה.
+
+=== END TEMPLATE CONTENT ===
+
+Notes:
+- Sent when user disables subscription (option 2 when subscribed)
+- Variable {{1}} receives "unsubscribed" but is not displayed
+- Variable {{2}} receives user phone number but is not displayed
+- Explains how to re-enable the bot
+- IMPORTANT: You may need separate templates for subscribed/unsubscribed or use conditional logic

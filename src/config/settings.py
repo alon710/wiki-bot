@@ -1,5 +1,6 @@
 from pathlib import Path
 from enum import Enum
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -42,13 +43,16 @@ class TwilioSettings(BaseSettings):
         alias="TWILIO_BASE_URL", default="https://localhost:8000"
     )
 
-    welcome_template_sid: str = Field(alias="TWILIO_WELCOME_TEMPLATE_SID", default="")
-    menu_template_sid: str = Field(alias="TWILIO_MENU_TEMPLATE_SID", default="")
-    subscription_template_sid: str = Field(
-        alias="TWILIO_SUBSCRIPTION_TEMPLATE_SID", default=""
+    subscription_subscribed_template_sid: str = Field(
+        alias="TWILIO_SUBSCRIPTION_SUBSCRIBED_TEMPLATE_SID", default=""
     )
-    daily_fact_template_sid: str = Field(alias="TWILIO_DAILY_FACT_TEMPLATE_SID", default="")
-    help_template_sid: str = Field(alias="TWILIO_HELP_TEMPLATE_SID", default="")
+    subscription_unsubscribed_template_sid: str = Field(
+        alias="TWILIO_SUBSCRIPTION_UNSUBSCRIBED_TEMPLATE_SID", default=""
+    )
+    daily_fact_template_sid: str = Field(
+        alias="TWILIO_DAILY_FACT_TEMPLATE_SID", default=""
+    )
+    menu_template_sid: str = Field(alias="TWILIO_MENU_TEMPLATE_SID", default="")
 
     @property
     def webhook_url(self) -> str:
@@ -123,7 +127,7 @@ class LoggingSettings(BaseSettings):
     )
 
     level: str = Field(alias="LOG_LEVEL", default="INFO")
-    format: str = Field(alias="LOG_FORMAT", default="console")
+    format: Literal["console", "json"] = Field(alias="LOG_FORMAT", default="console")
 
 
 class Settings(BaseSettings):

@@ -35,28 +35,32 @@ class WhatsAppService:
     def get_available_templates(self) -> dict:
         """Get all available template SIDs."""
         return {
-            "welcome": settings.twilio.welcome_template_sid,
-            "menu": settings.twilio.menu_template_sid,
-            "subscription": settings.twilio.subscription_template_sid,
+            "subscription_subscribed": settings.twilio.subscription_subscribed_template_sid,
+            "subscription_unsubscribed": settings.twilio.subscription_unsubscribed_template_sid,
             "daily_fact": settings.twilio.daily_fact_template_sid,
-            "help": settings.twilio.help_template_sid,
+            "menu": settings.twilio.menu_template_sid,
         }
 
-    def is_template_available(self, message_type: MessageType) -> bool:
+    def is_template_available(self, message_type: MessageType, content: str = "") -> bool:
         """Check if template is available for message type."""
-        template_sid = self._get_template_sid(message_type)
+        template_sid = self._get_template_sid(message_type, content)
         return bool(template_sid)
 
-    def _get_template_sid(self, message_type: MessageType) -> Optional[str]:
+    def _get_template_sid(self, message_type: MessageType, content: str = "") -> Optional[str]:
         """Get template SID for message type."""
+        if message_type == MessageType.SUBSCRIPTION_CHANGED:
+            if content == "subscribed":
+                return settings.twilio.subscription_subscribed_template_sid
+            elif content == "unsubscribed":
+                return settings.twilio.subscription_unsubscribed_template_sid
+            else:
+                return None
+        
         template_mapping = {
-            MessageType.WELCOME: settings.twilio.welcome_template_sid,
-            MessageType.SUBSCRIPTION_CHANGED: settings.twilio.subscription_template_sid,
             MessageType.DAILY_FACT: settings.twilio.daily_fact_template_sid,
-            MessageType.HELP: settings.twilio.help_template_sid,
             MessageType.MENU: settings.twilio.menu_template_sid,
         }
-        return template_mapping.get(message_type) or settings.twilio.menu_template_sid
+        return template_mapping.get(message_type)
 
     def _format_template_variables(
         self, message_type: MessageType, content: str, user: Optional[User] = None
@@ -96,7 +100,7 @@ class WhatsAppService:
 
             to_number = phone if phone.startswith("whatsapp:") else f"whatsapp:{phone}"
 
-            template_sid = self._get_template_sid(message_type)
+            template_sid = self._get_template_sid(message_type, content)
 
             if not template_sid:
                 logger.error(
@@ -200,34 +204,6 @@ class WhatsAppService:
             logger.error("Failed to send daily fact", phone=user.phone, error=str(e))
             return False
 
-    async def send_welcome_message(
-        self, phone: str, user: Optional[User] = None
-    ) -> bool:
-        """
-        Send welcome message when user first interacts.
-
-        Args:
-            phone: User's phone number
-            user: User object (for session-based messages)
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            content = "welcome_sandbox" if settings.twilio.is_sandbox else "welcome"
-
-            message_id = await self.send_message(
-                phone=phone,
-                content=content,
-                message_type=MessageType.WELCOME,
-                user=user,
-            )
-
-            return message_id is not None
-
-        except Exception as e:
-            logger.error("Failed to send welcome message", phone=phone, error=str(e))
-            return False
 
     async def send_subscription_changed_message(
         self, phone: str, subscribed: bool
@@ -262,32 +238,9 @@ class WhatsAppService:
             )
             return False
 
-    async def send_help_message(self, phone: str) -> bool:
-        """
-        Send help message with available options.
-
-        Args:
-            phone: User's phone number
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            content = "help"
-
-            message_id = await self.send_message(
-                phone=phone, content=content, message_type=MessageType.HELP
-            )
-
-            return message_id is not None
-
-        except Exception as e:
-            logger.error("Failed to send help message", phone=phone, error=str(e))
-            return False
-
     async def send_main_menu(self, phone: str, user: Optional[User] = None) -> bool:
         """
-        Send main menu for invalid input.
+        Send main menu using list picker template.
 
         Args:
             phone: User's phone number
@@ -297,6 +250,7 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
+            # Template handles the list picker interface
             content = "menu"
 
             message_id = await self.send_message(
@@ -353,31 +307,6 @@ class WhatsAppService:
         )
 
         return successful_sends
-
-    async def send_sandbox_instructions(self, phone: str) -> bool:
-        """
-        Send Twilio Sandbox join instructions to new users.
-
-        Args:
-            phone: User's phone number
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            content = "sandbox_instructions"
-
-            message_id = await self.send_message(
-                phone=phone, content=content, message_type=MessageType.WELCOME
-            )
-
-            return message_id is not None
-
-        except Exception as e:
-            logger.error(
-                "Failed to send sandbox instructions", phone=phone, error=str(e)
-            )
-            return False
 
 
 whatsapp_service = WhatsAppService()

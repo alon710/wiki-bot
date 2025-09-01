@@ -1,0 +1,17 @@
+Template Name: subscription
+Content Type: Standard
+Message Type: MessageType.SUBSCRIPTION_CHANGED (subscribed=true)
+Variables: {{1}} (content key - not used), {{2}} (user phone - optional)
+Environment Variable: TWILIO_SUBSCRIPTION_TEMPLATE_SID
+
+=== TEMPLATE CONTENT (copy to Twilio Console) ===
+
+✅ המנוי חודש בהצלחה! תתחיל לקבל עובדות יומיות שוב.
+
+=== END TEMPLATE CONTENT ===
+
+Notes:
+- Sent when user enables subscription (option 2 when already unsubscribed)
+- Variable {{1}} receives "subscribed" but is not displayed
+- Variable {{2}} receives user phone number but is not displayed
+- Confirms that daily facts will resume

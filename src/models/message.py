@@ -8,12 +8,9 @@ from sqlalchemy import JSON
 class MessageType(str, Enum):
     """Types of messages that can be sent."""
     
-    WELCOME = "welcome"
     DAILY_FACT = "daily_fact"
     SUBSCRIPTION_CHANGED = "subscription_changed"
-    HELP = "help"
     MENU = "menu"
-    ERROR = "error"
 
 
 class MessageStatus(str, Enum):

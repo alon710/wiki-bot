@@ -1,0 +1,47 @@
+Template Name: menu_list_picker
+Content Type: List Picker
+Message Type: MessageType.MENU
+Variables: {{1}} (content key - not used), {{2}} (user phone - optional)
+Environment Variable: TWILIO_MENU_TEMPLATE_SID
+
+=== TEMPLATE CONTENT (copy to Twilio Console) ===
+
+Header: בוט עובדות ויקיפדיה
+Body: אנא בחר אפשרות מהרשימה:
+
+List Button Text: ⚙️ תפריט אפשרויות
+
+List Sections:
+Section 1 Title: פעולות זמינות
+
+List Items:
+1. Title: 🧠 עובדה יומית
+   Description: קבל עובדה מעניינת מויקיפדיה
+   ID: daily_fact
+
+2. Title: 📧 ניהול מנוי
+   Description: הפעל או בטל מנוי לעובדות יומיות
+   ID: subscription_toggle
+
+3. Title: ❓ עזרה
+   Description: מידע על השימוש בבוט
+   ID: help
+
+Footer: בחר אפשרות כדי להמשיך
+
+=== END TEMPLATE CONTENT ===
+
+Notes:
+- Uses WhatsApp List Picker interactive template
+- Provides structured menu with descriptions
+- Each option has a unique ID for processing
+- More user-friendly than simple numbered text menu
+- Requires WhatsApp Business API (not sandbox)
+- Template must be approved by WhatsApp before use
+
+List Picker Configuration:
+- Header: Required, short title
+- Body: Main message text
+- Button Text: Text shown on the list button
+- List Items: Each with Title, Description, and unique ID
+- Footer: Optional closing text

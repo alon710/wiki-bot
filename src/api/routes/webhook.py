@@ -86,10 +86,10 @@ async def process_whatsapp_message(message: WhatsAppWebhookMessage):
             user_data = UserCreate(phone=phone)
             user = user_repository.create_user(user_data)
             
-            # Send welcome message for new users
-            await whatsapp_service.send_welcome_message(phone, user)
+            # Send main menu for new users 
+            await whatsapp_service.send_main_menu(phone, user)
             
-            logger.info("New user created and instructions sent", phone=phone, sandbox=settings.twilio.is_sandbox)
+            logger.info("New user created and menu sent", phone=phone, sandbox=settings.twilio.is_sandbox)
             return
         
         # Update last message timestamp for existing users
@@ -129,16 +129,16 @@ async def handle_number_response(phone: str, number: str):
         
         # Main menu responses
         if number == "1":
-            # Get Daily Fact - send help for now
-            await whatsapp_service.send_help_message(phone)
+            # Get Daily Fact - show menu for now (individual facts not implemented)
+            await whatsapp_service.send_main_menu(phone, user)
             
         elif number == "2":
             # Toggle subscription
             await handle_subscription_toggle(phone, user)
             
         elif number == "3":
-            # Help
-            await whatsapp_service.send_help_message(phone)
+            # Help - show menu for now (help not implemented)
+            await whatsapp_service.send_main_menu(phone, user)
             
         else:
             # Unknown number - show main menu
