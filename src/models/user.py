@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
 from typing import Optional
-from venv import logger
 from sqlmodel import SQLModel, Field
+
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # Removed Language import - Hebrew only bot
 
@@ -37,10 +40,18 @@ class User(SQLModel, table=True):
     def is_in_session_window(self) -> bool:
         """Check if user is within 24-hour session window for free-form messages."""
         if not self.last_message_at:
-            logger.info("No last_message_at timestamp found for user %s", self.phone)
+            logger.info("No last_message_at timestamp found for user", phone=self.phone)
             return False
 
-        time_diff = datetime.now(timezone.utc) - self.last_message_at
+        # Ensure both datetimes are timezone-aware
+        now = datetime.now(timezone.utc)
+        last_msg = self.last_message_at
+        
+        # If last_message_at is naive, make it timezone-aware (assume UTC)
+        if last_msg.tzinfo is None:
+            last_msg = last_msg.replace(tzinfo=timezone.utc)
+        
+        time_diff = now - last_msg
         return time_diff.total_seconds() < 24 * 60 * 60  # 24 hours in seconds
 
 
