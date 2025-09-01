@@ -47,7 +47,6 @@ class TwilioSettings(BaseSettings):
     subscription_template_sid: str = Field(
         alias="TWILIO_SUBSCRIPTION_TEMPLATE_SID", default=""
     )
-    language_template_sid: str = Field(alias="TWILIO_LANGUAGE_TEMPLATE_SID", default="")
     daily_fact_template_sid: str = Field(alias="TWILIO_DAILY_FACT_TEMPLATE_SID", default="")
     help_template_sid: str = Field(alias="TWILIO_HELP_TEMPLATE_SID", default="")
 

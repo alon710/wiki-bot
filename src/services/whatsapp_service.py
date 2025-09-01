@@ -38,7 +38,6 @@ class WhatsAppService:
             "welcome": settings.twilio.welcome_template_sid,
             "menu": settings.twilio.menu_template_sid,
             "subscription": settings.twilio.subscription_template_sid,
-            "language": settings.twilio.language_template_sid,
             "daily_fact": settings.twilio.daily_fact_template_sid,
             "help": settings.twilio.help_template_sid,
         }
@@ -53,9 +52,9 @@ class WhatsAppService:
         template_mapping = {
             MessageType.WELCOME: settings.twilio.welcome_template_sid,
             MessageType.SUBSCRIPTION_CHANGED: settings.twilio.subscription_template_sid,
-            MessageType.LANGUAGE_CHANGED: settings.twilio.language_template_sid,
             MessageType.DAILY_FACT: settings.twilio.daily_fact_template_sid,
             MessageType.HELP: settings.twilio.help_template_sid,
+            MessageType.MENU: settings.twilio.menu_template_sid,
         }
         return template_mapping.get(message_type) or settings.twilio.menu_template_sid
 
@@ -66,23 +65,21 @@ class WhatsAppService:
 
         import json
 
-        # Basic template variables - customize per message type
+        # Pass content as variable 1
         variables = {"1": content}
         
-        # Message type specific variables
-        if message_type == MessageType.DAILY_FACT:
-            variables["2"] = "ויקיפדיה"  # Source
-            if user:
-                variables["3"] = user.phone  # Can be used for personalization
-        elif message_type == MessageType.WELCOME:
-            variables["2"] = "09:00 UTC"  # Delivery time
-        elif user:
-            variables["2"] = user.phone  # Can be used for personalization
-        
+        # Add user phone as variable 2 for personalization if available
+        if user and user.phone:
+            variables["2"] = user.phone
+
         return json.dumps(variables)
 
     async def send_message(
-        self, phone: str, content: str, message_type: MessageType, user: Optional[User] = None
+        self,
+        phone: str,
+        content: str,
+        message_type: MessageType,
+        user: Optional[User] = None,
     ) -> Optional[str]:
         """
         Send a WhatsApp message to a specific phone number.
@@ -144,7 +141,6 @@ class WhatsAppService:
 
             external_id = response.sid if response else None
 
-            # Verify the response and log details
             if external_id:
                 logger.info(
                     "WhatsApp message sent successfully",
@@ -153,7 +149,7 @@ class WhatsAppService:
                     external_id=external_id,
                     sandbox=settings.twilio.is_sandbox,
                     should_use_template=should_use_template,
-                    response_status=getattr(response, 'status', 'unknown'),
+                    response_status=getattr(response, "status", "unknown"),
                 )
             else:
                 logger.warning(
@@ -202,13 +198,9 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            formatted_message = (
-                f"🧠 עובדה יומית מרתקת:\n\n{fact_content}\n\n📚 מקור: ויקיפדיה"
-            )
-
             message_id = await self.send_message(
                 phone=user.phone,
-                content=formatted_message,
+                content=fact_content,
                 message_type=MessageType.DAILY_FACT,
                 user=user,
             )
@@ -219,7 +211,9 @@ class WhatsAppService:
             logger.error("Failed to send daily fact", phone=user.phone, error=str(e))
             return False
 
-    async def send_welcome_message(self, phone: str, user: Optional[User] = None) -> bool:
+    async def send_welcome_message(
+        self, phone: str, user: Optional[User] = None
+    ) -> bool:
         """
         Send welcome message when user first interacts.
 
@@ -231,30 +225,11 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            if settings.twilio.is_sandbox:
-                content = (
-                    "🎉 ברוך הבא לבוט העובדות הישראלי!"
-                    "\n\nכדי לקבל הודעות, תצטרך להצטרף ל-WhatsApp Sandbox של Twilio. "
-                    "שלח את הודעת הקוד הבא ל- +1 (415) 523-8886:"
-                    "\n\njoin @sandbox_keyword"
-                    "\n\nלאחר ההצטרפות, תקבל עובדה מעניינת כל יום בשעה 09:00 UTC.\n\n"
-                    "בחר אפשרות מהתפריט:"
-                    "\n1️⃣ עובדה יומית"
-                    "\n2️⃣ הפסק מנוי"
-                    "\n3️⃣ עזרה"
-                )
-            else:
-                content = (
-                    "🎉 ברוך הבא לבוט העובדות הישראלי!"
-                    "\n\nתקבל עובדה מעניינת כל יום בשעה 09:00 UTC.\n\n"
-                    "בחר אפשרות מהתפריט:"
-                    "\n1️⃣ עובדה יומית"
-                    "\n2️⃣ הפסק מנוי"
-                    "\n3️⃣ עזרה"
-                )
+            # Templates handle the Hebrew text and formatting
+            content = "welcome_sandbox" if settings.twilio.is_sandbox else "welcome"
 
             message_id = await self.send_message(
-                phone=phone, content=content, message_type=MessageType.WELCOME
+                phone=phone, content=content, message_type=MessageType.WELCOME, user=user
             )
 
             return message_id is not None
@@ -277,10 +252,8 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            if subscribed:
-                content = "✅ המנוי חודש בהצלחה! תתחיל לקבל עובדות יומיות שוב."
-            else:
-                content = "❌ המנוי בוטל בהצלחה. לא תקבל יותר עובדות יומיות. שלח /start כדי להתחיל שוב."
+            # Templates handle the Hebrew text and formatting
+            content = "subscribed" if subscribed else "unsubscribed"
 
             message_id = await self.send_message(
                 phone=phone,
@@ -310,15 +283,8 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            content = (
-                "📖 עזרה - בוט עובדות ויקיפדיה\n\n"
-                "אפשרויות זמינות:\n"
-                "1️⃣ עובדה יומית\n"
-                "2️⃣ הפסק מנוי\n"
-                "3️⃣ עזרה\n\n"
-                "הבוט שולח עובדה מעניינת אחת ביום בשעה 09:00 UTC.\n\n"
-                "יש בעיה? צור קשר עם התמיכה שלנו."
-            )
+            # Template handles the Hebrew text and formatting
+            content = "help"
 
             message_id = await self.send_message(
                 phone=phone, content=content, message_type=MessageType.HELP
@@ -342,10 +308,11 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            content = "❓ אנא בחר מספר מהתפריט:\n\n1️⃣ עובדה יומית\n2️⃣ הפסק מנוי\n3️⃣ עזרה"
+            # Template handles the Hebrew text and formatting
+            content = "menu"
 
             message_id = await self.send_message(
-                phone=phone, content=content, message_type=MessageType.ERROR, user=user
+                phone=phone, content=content, message_type=MessageType.MENU, user=user
             )
 
             return message_id is not None
@@ -410,14 +377,8 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            content = (
-                "🔧 הודעה חשובה!\n\n"
-                "אתה משתמש בסביבת הבדיקות של Twilio WhatsApp.\n"
-                "כדי לקבל הודעות, עליך לשלוח תחילה את המסר:\n"
-                "join depend-wheat\n\n"
-                "שלח הודעה זו ל: whatsapp:+14155238886\n\n"
-                "לאחר מכן תוכל לחזור לכאן ולהתחיל להשתמש בבוט."
-            )
+            # Template handles the Hebrew text and formatting
+            content = "sandbox_instructions"
 
             message_id = await self.send_message(
                 phone=phone, content=content, message_type=MessageType.WELCOME
@@ -430,7 +391,6 @@ class WhatsAppService:
                 "Failed to send sandbox instructions", phone=phone, error=str(e)
             )
             return False
-
 
 
 whatsapp_service = WhatsAppService()

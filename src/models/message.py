@@ -10,9 +10,9 @@ class MessageType(str, Enum):
     
     WELCOME = "welcome"
     DAILY_FACT = "daily_fact"
-    LANGUAGE_CHANGED = "language_changed"
     SUBSCRIPTION_CHANGED = "subscription_changed"
     HELP = "help"
+    MENU = "menu"
     ERROR = "error"
 
 
