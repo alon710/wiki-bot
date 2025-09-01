@@ -95,6 +95,26 @@ class DatabaseClient:
         finally:
             session.close()
 
+    @contextmanager
+    def get_session_no_commit(self) -> Generator[Session, None, None]:
+        """Get database session with manual commit control."""
+        if self._session_factory is None:
+            raise RuntimeError("Database not initialized")
+
+        session = self._session_factory()
+        try:
+            yield session
+            # No automatic commit - caller must handle commit/rollback
+        except (OperationalError, DisconnectionError) as e:
+            logger.warning("Database connection error, session will be rolled back", error=str(e))
+            session.rollback()
+            raise
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=5),
@@ -103,6 +123,16 @@ class DatabaseClient:
     def execute_with_retry(self, operation):
         """Execute a database operation with automatic retry on connection failures."""
         with self.get_session() as session:
+            return operation(session)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        retry=retry_if_exception_type((OperationalError, DisconnectionError))
+    )
+    def execute_with_retry_manual_commit(self, operation):
+        """Execute a database operation with manual commit control and retry on connection failures."""
+        with self.get_session_no_commit() as session:
             return operation(session)
 
     def health_check(self) -> bool:

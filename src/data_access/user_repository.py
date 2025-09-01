@@ -16,7 +16,7 @@ class UserRepository:
     def create_user(self, user_data: UserCreate) -> User:
         """Create a new user."""
         try:
-            with database_client.get_session() as session:
+            def create_user_operation(session):
                 user = User(**user_data.model_dump())
                 session.add(user)
                 session.commit()
@@ -24,6 +24,8 @@ class UserRepository:
                 
                 logger.info("User created successfully", phone=user.phone, language=user.language)
                 return user
+                
+            return database_client.execute_with_retry_manual_commit(create_user_operation)
                 
         except Exception as e:
             logger.error("Failed to create user", phone=user_data.phone, error=str(e))
@@ -73,7 +75,7 @@ class UserRepository:
                 logger.info("User updated successfully", phone=phone, updated_fields=list(update_data.keys()))
                 return user
                 
-            return database_client.execute_with_retry(update_user_operation)
+            return database_client.execute_with_retry_manual_commit(update_user_operation)
                 
         except Exception as e:
             logger.error("Failed to update user", phone=phone, error=str(e))
