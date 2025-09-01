@@ -65,10 +65,8 @@ class WhatsAppService:
 
         import json
 
-        # Pass content as variable 1
         variables = {"1": content}
-        
-        # Add user phone as variable 2 for personalization if available
+
         if user and user.phone:
             variables["2"] = user.phone
 
@@ -98,91 +96,82 @@ class WhatsAppService:
 
             to_number = phone if phone.startswith("whatsapp:") else f"whatsapp:{phone}"
 
-            should_use_template = False
-            template_sid = None
-            template_variables = None
+            template_sid = self._get_template_sid(message_type)
 
-            if (
-                user
-                and not user.is_in_session_window()
-                and not settings.twilio.is_sandbox
-                and settings.twilio.has_templates
-            ):
-                template_sid = self._get_template_sid(message_type)
-                if template_sid:
-                    should_use_template = True
-                    template_variables = self._format_template_variables(
-                        message_type, content, user
-                    )
-                    logger.info(
-                        "User outside session window, using template message",
-                        phone=phone,
-                        template_sid=template_sid,
-                        last_message_at=user.last_message_at,
-                    )
-                else:
-                    logger.warning(
-                        "Template required but not available, falling back to regular message",
-                        phone=phone,
-                        message_type=message_type,
-                    )
+            if not template_sid:
+                logger.error(
+                    "No template available for message type - cannot send message",
+                    phone=phone,
+                    message_type=message_type,
+                    available_templates=list(self.get_available_templates().keys()),
+                )
+                return None
 
-            if should_use_template and template_sid:
-                response = self.client.messages.create(
-                    content_sid=template_sid,
-                    content_variables=template_variables,
-                    from_=settings.twilio.whatsapp_from,
-                    to=to_number,
-                )
-            else:
-                response = self.client.messages.create(
-                    body=content, from_=settings.twilio.whatsapp_from, to=to_number
-                )
+            template_variables = self._format_template_variables(
+                message_type, content, user
+            )
+
+            logger.info(
+                "Sending template message",
+                phone=phone,
+                message_type=message_type,
+                template_sid=template_sid,
+                template_variables=template_variables,
+                user_in_session=user.is_in_session_window() if user else None,
+                last_message_at=user.last_message_at if user else None,
+                sandbox=settings.twilio.is_sandbox,
+            )
+
+            response = self.client.messages.create(
+                content_sid=template_sid,
+                content_variables=template_variables,
+                from_=settings.twilio.whatsapp_from,
+                to=to_number,
+            )
 
             external_id = response.sid if response else None
 
             if external_id:
                 logger.info(
-                    "WhatsApp message sent successfully",
+                    "WhatsApp template message sent successfully",
                     phone=phone,
                     message_type=message_type,
                     external_id=external_id,
-                    sandbox=settings.twilio.is_sandbox,
-                    should_use_template=should_use_template,
+                    template_sid=template_sid,
                     response_status=getattr(response, "status", "unknown"),
+                    sandbox=settings.twilio.is_sandbox,
                 )
             else:
                 logger.warning(
-                    "WhatsApp message sent but no SID received",
+                    "WhatsApp template message sent but no SID received",
                     phone=phone,
                     message_type=message_type,
+                    template_sid=template_sid,
                     sandbox=settings.twilio.is_sandbox,
-                    should_use_template=should_use_template,
                 )
 
             return external_id
 
         except TwilioException as e:
             logger.error(
-                "Twilio API error when sending WhatsApp message",
+                "Twilio API error when sending WhatsApp template message",
                 phone=phone,
                 message_type=message_type,
+                template_sid=template_sid,
                 error_code=getattr(e, "code", None),
                 error_message=str(e),
                 sandbox=settings.twilio.is_sandbox,
-                should_use_template=should_use_template,
-                template_sid=template_sid,
             )
             return None
         except Exception as e:
             logger.error(
-                "Failed to send WhatsApp message",
+                "Failed to send WhatsApp template message",
                 phone=phone,
                 message_type=message_type,
+                template_sid=template_sid if "template_sid" in locals() else None,
                 error=str(e),
                 error_type=type(e).__name__,
                 sandbox=settings.twilio.is_sandbox,
-                should_use_template=should_use_template,
             )
             return None
 
@@ -225,11 +214,13 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            # Templates handle the Hebrew text and formatting
             content = "welcome_sandbox" if settings.twilio.is_sandbox else "welcome"
 
             message_id = await self.send_message(
-                phone=phone, content=content, message_type=MessageType.WELCOME, user=user
+                phone=phone,
+                content=content,
+                message_type=MessageType.WELCOME,
+                user=user,
             )
 
             return message_id is not None
@@ -252,7 +243,6 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            # Templates handle the Hebrew text and formatting
             content = "subscribed" if subscribed else "unsubscribed"
 
             message_id = await self.send_message(
@@ -283,7 +273,6 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            # Template handles the Hebrew text and formatting
             content = "help"
 
             message_id = await self.send_message(
@@ -308,7 +297,6 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            # Template handles the Hebrew text and formatting
             content = "menu"
 
             message_id = await self.send_message(
@@ -377,7 +365,6 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            # Template handles the Hebrew text and formatting
             content = "sandbox_instructions"
 
             message_id = await self.send_message(
