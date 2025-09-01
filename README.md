@@ -115,7 +115,7 @@ SCHEDULER_FACT_GENERATION_MINUTE=0
 
 # Server
 SERVER_HOST=0.0.0.0
-SERVER_PORT=8000
+SERVER_PORT=80
 ```
 
 ## Usage
@@ -128,7 +128,7 @@ python main.py
 
 Or with uvicorn directly:
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn main:app --host 0.0.0.0 --port 80 --reload
 ```
 
 ### WhatsApp Commands
@@ -273,7 +273,7 @@ TWILIO_AUTH_TOKEN=your-production-auth-token
 TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 OPENROUTER_API_KEY=your-production-key
 SERVER_HOST=0.0.0.0
-SERVER_PORT=8000
+SERVER_PORT=80
 LOG_LEVEL=INFO
 ```
 
@@ -315,7 +315,7 @@ LOG_LEVEL=INFO
    - Check that all required environment variables are set
    - Ensure PostgreSQL is accessible from the container
    - View container logs: `docker logs <container-name>`
-   - Test health endpoint: `curl http://localhost:8000/health`
+   - Test health endpoint: `curl http://localhost:80/health`
    - For database connectivity, ensure DATABASE_URL points to accessible host
 
 ### Logs

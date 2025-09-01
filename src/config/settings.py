@@ -85,7 +85,7 @@ class ServerSettings(BaseSettings):
     )
 
     host: str = Field(alias="SERVER_HOST", default="0.0.0.0")
-    port: int = Field(alias="SERVER_PORT", default=8000)
+    port: int = Field(alias="SERVER_PORT", default=80)
     reload: bool = Field(alias="SERVER_RELOAD", default=False)
     log_level: str = Field(alias="SERVER_LOG_LEVEL", default="info")
 
