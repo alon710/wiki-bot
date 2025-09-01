@@ -36,15 +36,40 @@ A cost-optimized WhatsApp bot that sends daily Wikipedia facts in English and He
 
 ## Installation
 
+### Option 1: Docker (Recommended)
+
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
    cd wiki-bot
    ```
 
-2. **Install dependencies**:
+2. **Set up environment variables**:
    ```bash
-   pip install -r requirements.txt
+   cp .env.example .env
+   # Edit .env with your configuration (especially API keys)
+   ```
+
+3. **Build and run with Docker**:
+   ```bash
+   # Build the image
+   docker build -t wikibot .
+   
+   # Run the container
+   docker run -p 8000:8000 --env-file .env wikibot
+   ```
+
+### Option 2: Local Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd wiki-bot
+   ```
+
+2. **Install dependencies with uv**:
+   ```bash
+   uv sync
    ```
 
 3. **Set up environment variables**:
@@ -109,23 +134,18 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ### WhatsApp Commands
 
 Users can interact with the bot using these commands:
-- `/start` - Subscribe to daily facts
-- `/stop` - Unsubscribe from daily facts  
-- `/english` - Switch to English facts
-- `/hebrew` - Switch to Hebrew facts
-- `/help` - Show help message
+- `/start` or `/subscribe` - Subscribe to daily facts
+- `/stop` or `/unsubscribe` - Unsubscribe from daily facts  
+- `/english` or `/en` - Switch to English facts
+- `/hebrew` or `/he` or `/עברית` - Switch to Hebrew facts
+- `/help` or `/h` - Show help message
 
 ### Admin Endpoints
 
 - `GET /` - Basic application info
 - `GET /health` - Simple health check
-- `GET /admin/health` - Comprehensive health check
-- `GET /admin/stats` - System statistics
-- `POST /admin/trigger-daily-facts` - Manually trigger fact generation
-- `GET /admin/jobs` - List scheduled jobs
-- `POST /admin/create-tables` - Create database tables
-- `POST /admin/test-wikipedia/{language}` - Test Wikipedia service
-- `POST /admin/test-ai` - Test AI service
+- `GET /admin/health` - Comprehensive health check with all service status
+- `GET /admin/stats` - System statistics (users, facts, scheduler status)
 
 ### Webhook Setup
 
@@ -217,18 +237,31 @@ python -m pytest tests/test_wikipedia_service.py
 
 ## Deployment
 
-### Docker (Recommended)
+### Docker
 
-```dockerfile
-FROM python:3.11-slim
+The application includes a production-ready Dockerfile:
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+```bash
+# Build the image
+docker build -t wikibot .
 
-COPY . .
-CMD ["python", "main.py"]
+# Run with environment variables
+docker run -p 8000:8000 --env-file .env wikibot
+
+# Or run with individual environment variables
+docker run -p 8000:8000 \
+  -e DATABASE_URL="postgresql://user:pass@host:5432/wikibot" \
+  -e TWILIO_ACCOUNT_SID="your-account-sid" \
+  -e TWILIO_AUTH_TOKEN="your-auth-token" \
+  -e OPENROUTER_API_KEY="your-api-key" \
+  wikibot
 ```
+
+**Docker Features:**
+- Multi-stage build for optimized image size
+- Non-root user for security
+- Health checks included
+- Uses uv for faster dependency installation
 
 ### Environment Variables for Production
 
@@ -277,6 +310,13 @@ LOG_LEVEL=INFO
    - Check model availability and pricing
    - Review OpenRouter error logs
    - Ensure sufficient credits in OpenRouter account
+
+5. **Docker Container Issues**
+   - Check that all required environment variables are set
+   - Ensure PostgreSQL is accessible from the container
+   - View container logs: `docker logs <container-name>`
+   - Test health endpoint: `curl http://localhost:8000/health`
+   - For database connectivity, ensure DATABASE_URL points to accessible host
 
 ### Logs
 
