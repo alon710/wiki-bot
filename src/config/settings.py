@@ -15,12 +15,7 @@ class Environment(str, Enum):
     PRODUCTION = "production"
 
 
-class Language(str, Enum):
-    ENGLISH = "en"
-    HEBREW = "he"
-    RUSSIAN = "ru"
-    ARABIC = "ar"
-    SPANISH = "es"
+# Removed multi-language support - Hebrew only bot
 
 
 class DatabaseSettings(BaseSettings):
@@ -47,7 +42,6 @@ class TwilioSettings(BaseSettings):
         alias="TWILIO_BASE_URL", default="https://localhost:8000"
     )
 
-    # Template message SIDs for WhatsApp Business API
     welcome_template_sid: str = Field(alias="TWILIO_WELCOME_TEMPLATE_SID", default="")
     menu_template_sid: str = Field(alias="TWILIO_MENU_TEMPLATE_SID", default="")
     subscription_template_sid: str = Field(

@@ -5,7 +5,7 @@ from sqlmodel import select
 from src.models.user import User, UserCreate, UserUpdate
 from src.data_access.database_client import database_client
 from src.utils.logger import get_logger
-from src.config.settings import Language
+# Removed Language import - Hebrew only bot
 
 logger = get_logger(__name__)
 
@@ -22,7 +22,7 @@ class UserRepository:
                 session.commit()
                 session.refresh(user)
                 
-                logger.info("User created successfully", phone=user.phone, language=user.language)
+                logger.info("User created successfully", phone=user.phone)
                 return user
                 
             return database_client.execute_with_retry_manual_commit(create_user_operation)
@@ -45,7 +45,6 @@ class UserRepository:
                     user_copy = User(
                         id=user_from_db.id,
                         phone=user_from_db.phone,
-                        language=user_from_db.language,
                         subscribed=user_from_db.subscribed,
                         last_message_at=user_from_db.last_message_at,
                         created_at=user_from_db.created_at,
@@ -61,7 +60,6 @@ class UserRepository:
                 logger.debug("User found", 
                            phone=phone, 
                            user_id=user.id,
-                           language=user.language,
                            subscribed=user.subscribed)
             else:
                 logger.debug("User not found", phone=phone)
@@ -105,22 +103,19 @@ class UserRepository:
             logger.error("Failed to update user", phone=phone, error=str(e))
             raise
     
-    def get_subscribed_users_by_language(self, language: Language) -> List[User]:
-        """Get all subscribed users for a specific language."""
+    def get_all_subscribed_users_hebrew(self) -> List[User]:
+        """Get all subscribed users (Hebrew only bot)."""
         try:
             def get_users_operation(session):
-                statement = select(User).where(
-                    User.subscribed,
-                    User.language == language
-                )
+                statement = select(User).where(User.subscribed)
                 return session.exec(statement).all()
                 
             users = database_client.execute_with_retry(get_users_operation)
-            logger.info("Retrieved subscribed users", language=language, count=len(users))
+            logger.info("Retrieved subscribed Hebrew users", count=len(users))
             return users
                 
         except Exception as e:
-            logger.error("Failed to get subscribed users", language=language, error=str(e))
+            logger.error("Failed to get subscribed users", error=str(e))
             raise
     
     def get_all_subscribed_users(self) -> List[User]:

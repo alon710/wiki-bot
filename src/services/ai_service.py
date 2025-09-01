@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional
 from openai import OpenAI
 
-from src.config.settings import settings, Language
+from src.config.settings import settings
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -18,27 +18,26 @@ class AIService:
         )
         logger.info("AI service initialized with OpenRouter")
     
-    def generate_daily_fact_summary(self, article_data: Dict[str, Any]) -> Optional[str]:
+    def generate_hebrew_daily_fact(self, article_data: Dict[str, Any]) -> Optional[str]:
         """
-        Generate an engaging daily fact summary from Wikipedia article data.
+        Generate an engaging Hebrew daily fact summary from Wikipedia article data.
         
         Args:
-            article_data: Dictionary containing article title, summary, text, and language
+            article_data: Dictionary containing article title, summary, and text
         
         Returns:
-            Engaging fact summary or None if generation fails
+            Engaging Hebrew fact summary or None if generation fails
         """
         try:
             title = article_data.get("title", "")
             content = article_data.get("full_text", article_data.get("summary", ""))
-            language = article_data.get("language", Language.ENGLISH.value)
             
             if not content:
                 logger.error("No content provided for summarization", title=title)
                 return None
             
-            # Create language-specific prompt
-            prompt = self._create_summarization_prompt(title, content, language)
+            # Create Hebrew summarization prompt
+            prompt = self._create_hebrew_prompt(title, content)
             
             # Make API call to OpenRouter
             response = self.client.chat.completions.create(
@@ -46,7 +45,7 @@ class AIService:
                 messages=[
                     {
                         "role": "system",
-                        "content": self._get_system_prompt(language)
+                        "content": self._get_hebrew_system_prompt()
                     },
                     {
                         "role": "user",
@@ -64,47 +63,36 @@ class AIService:
                 summary = response.choices[0].message.content.strip()
                 
                 # Validate summary
-                if self._validate_summary(summary, language):
-                    logger.info("AI fact summary generated successfully",
+                if self._validate_hebrew_summary(summary):
+                    logger.info("Hebrew AI fact summary generated successfully",
                               title=title,
-                              language=language,
                               summary_length=len(summary))
                     return summary
                 else:
-                    logger.warning("Generated summary failed validation",
-                                 title=title,
-                                 language=language)
+                    logger.warning("Generated Hebrew summary failed validation",
+                                 title=title)
                     return None
             
-            logger.error("No response from OpenRouter", title=title, language=language)
+            logger.error("No response from OpenRouter", title=title)
             return None
             
         except Exception as e:
-            logger.error("Failed to generate AI summary",
+            logger.error("Failed to generate Hebrew AI summary",
                         title=article_data.get("title", ""),
-                        language=article_data.get("language", ""),
                         error=str(e))
             return None
     
-    def _get_system_prompt(self, language: str) -> str:
-        """Get system prompt based on language."""
-        if language == Language.HEBREW.value:
-            return (
-                "אתה כותב עובדות יומיות מעניינות ומרתקות מויקיפדיה בעברית. "
-                "המטרה שלך היא ליצור עובדה קצרה (2-3 משפטים) שתעורר עניין ותהיה קלה לזכירה. "
-                "השתמש בשפה פשוטה וברורה, וודא שהעובדה מרתקת ומעניינת לקורא הישראלי הממוצע."
-            )
-        else:
-            return (
-                "You are a writer of interesting and engaging daily facts from Wikipedia in English. "
-                "Your goal is to create a short (2-3 sentences) fact that will spark curiosity and be memorable. "
-                "Use simple and clear language, and ensure the fact is fascinating and interesting to the average reader."
-            )
+    def _get_hebrew_system_prompt(self) -> str:
+        """Get Hebrew system prompt."""
+        return (
+            "אתה כותב עובדות יומיות מעניינות ומרתקות מויקיפדיה בעברית. "
+            "המטרה שלך היא ליצור עובדה קצרה (2-3 משפטים) שתעורר עניין ותהיה קלה לזכירה. "
+            "השתמש בשפה פשוטה וברורה, וודא שהעובדה מרתקת ומעניינת לקורא הישראלי הממוצע."
+        )
     
-    def _create_summarization_prompt(self, title: str, content: str, language: str) -> str:
-        """Create summarization prompt based on language."""
-        if language == Language.HEBREW.value:
-            return f"""
+    def _create_hebrew_prompt(self, title: str, content: str) -> str:
+        """Create Hebrew summarization prompt."""
+        return f"""
 הכותרת: {title}
 
 התוכן:
@@ -119,25 +107,9 @@ class AIService:
 
 העובדה היומית:
 """
-        else:
-            return f"""
-Title: {title}
-
-Content:
-{content[:1500]}
-
-Please create an interesting and engaging daily fact based on this information. The fact should be:
-- 2-3 sentences long
-- Written in simple, clear English
-- Fascinating and memorable
-- Accurate to the provided information
-- Suitable for a general audience
-
-Daily Fact:
-"""
     
-    def _validate_summary(self, summary: str, language: str) -> bool:
-        """Validate the generated summary."""
+    def _validate_hebrew_summary(self, summary: str) -> bool:
+        """Validate the generated Hebrew summary."""
         if not summary or len(summary.strip()) == 0:
             return False
         
@@ -146,7 +118,7 @@ Daily Fact:
         max_length = 400  # Maximum characters
         
         if len(summary) < min_length or len(summary) > max_length:
-            logger.warning("Summary length out of bounds",
+            logger.warning("Hebrew summary length out of bounds",
                          length=len(summary),
                          min_length=min_length,
                          max_length=max_length)
@@ -155,18 +127,16 @@ Daily Fact:
         # Check sentence count (should be 2-4 sentences)
         sentence_count = len([s for s in summary.split('.') if s.strip()])
         if sentence_count < 1 or sentence_count > 5:
-            logger.warning("Summary sentence count out of bounds",
+            logger.warning("Hebrew summary sentence count out of bounds",
                          sentence_count=sentence_count)
             return False
         
-        # Language-specific validation
-        if language == Language.HEBREW.value:
-            # Check if summary contains Hebrew characters
-            hebrew_chars = sum(1 for char in summary if '\u0590' <= char <= '\u05FF')
-            if hebrew_chars < len(summary) * 0.3:  # At least 30% Hebrew
-                logger.warning("Hebrew summary contains insufficient Hebrew characters",
-                             hebrew_ratio=hebrew_chars / len(summary))
-                return False
+        # Check if summary contains Hebrew characters
+        hebrew_chars = sum(1 for char in summary if '\u0590' <= char <= '\u05FF')
+        if hebrew_chars < len(summary) * 0.3:  # At least 30% Hebrew
+            logger.warning("Hebrew summary contains insufficient Hebrew characters",
+                         hebrew_ratio=hebrew_chars / len(summary))
+            return False
         
         # Check for common AI response patterns to avoid
         avoid_patterns = [
@@ -176,13 +146,12 @@ Daily Fact:
         
         summary_lower = summary.lower()
         if any(pattern.lower() in summary_lower for pattern in avoid_patterns):
-            logger.warning("Summary contains unwanted AI response patterns")
+            logger.warning("Hebrew summary contains unwanted AI response patterns")
             return False
         
-        logger.debug("Summary validation passed",
+        logger.debug("Hebrew summary validation passed",
                     length=len(summary),
-                    sentence_count=sentence_count,
-                    language=language)
+                    sentence_count=sentence_count)
         
         return True
     

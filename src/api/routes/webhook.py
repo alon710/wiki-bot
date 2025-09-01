@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Form
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from src.config.settings import Language
+from src.config.settings import settings
 from src.models.message import WhatsAppWebhookMessage
 from src.models.user import UserCreate, UserUpdate
 from src.data_access.user_repository import user_repository
@@ -87,20 +87,15 @@ async def process_whatsapp_message(message: WhatsAppWebhookMessage):
         
         if not user:
             # New user - create with default settings
-            user_data = UserCreate(phone=phone, language=Language.ENGLISH)
+            user_data = UserCreate(phone=phone)
             user = user_repository.create_user(user_data)
             
             logger.debug("New user created", 
                         phone=phone, 
-                        user_id=user.id,
-                        user_language=user.language)
+                        user_id=user.id)
             
-            # Check if using sandbox - send join instructions first
-            if settings.twilio.is_sandbox:
-                await whatsapp_service.send_sandbox_instructions(phone, user.language)
-            else:
-                # Send main menu for new users
-                await whatsapp_service.send_main_menu(phone, user.language, user)
+            # Send welcome message for new users
+            await whatsapp_service.send_welcome_message(phone, user)
             
             logger.info("New user created and instructions sent", phone=phone, sandbox=settings.twilio.is_sandbox)
             return
@@ -113,7 +108,7 @@ async def process_whatsapp_message(message: WhatsAppWebhookMessage):
             await handle_number_response(phone, body.strip())
         else:
             # Any non-number message should get main menu
-            await whatsapp_service.send_main_menu(phone, user.language, user)
+            await whatsapp_service.send_main_menu(phone, user)
         
     except Exception as e:
         logger.error("Failed to process WhatsApp message",
@@ -142,36 +137,26 @@ async def handle_number_response(phone: str, number: str):
             logger.warning("User not found for number processing", phone=phone)
             return
             
-        current_language = user.language
         logger.debug("User data retrieved for number", 
                     phone=phone, 
-                    language=current_language, 
                     subscribed=user.subscribed)
         
         # Main menu responses
         if number == "1":
-            # Get Daily Fact - for now send help until we implement fact fetching
-            await whatsapp_service.send_help_message(phone, current_language)
+            # Get Daily Fact - send help for now
+            await whatsapp_service.send_help_message(phone)
             
         elif number == "2":
-            # Manage Subscription - show subscription menu
-            await whatsapp_service.send_subscription_menu(phone, current_language, user.subscribed, user)
+            # Toggle subscription
+            await handle_subscription_toggle(phone, user)
             
         elif number == "3":
-            # Change Language - show language menu
-            await whatsapp_service.send_language_menu(phone, current_language, user)
-            
-        elif number == "4":
             # Help
-            await whatsapp_service.send_help_message(phone, current_language)
-            
-        elif number == "0":
-            # Back to main menu
-            await whatsapp_service.send_main_menu(phone, current_language, user)
+            await whatsapp_service.send_help_message(phone)
             
         else:
-            # Handle subscription and language menu responses
-            await handle_sub_menu_response(phone, number, user)
+            # Unknown number - show main menu
+            await whatsapp_service.send_main_menu(phone, user)
         
         logger.info("Number response processed successfully",
                    phone=phone,
@@ -185,55 +170,25 @@ async def handle_number_response(phone: str, number: str):
                     error_type=type(e).__name__)
 
 
-async def handle_sub_menu_response(phone: str, number: str, user):
-    """Handle responses in subscription and language sub-menus."""
+async def handle_subscription_toggle(phone: str, user):
+    """Handle subscription toggle for user."""
     try:
-        current_language = user.language
-        
-        # This could be subscription menu (1=subscribe/unsubscribe, 0=back)
-        # or language menu (1=English, 2=Hebrew, 0=back)
-        
-        if number == "1":
-            # Check if we're in subscription context or language context
-            # For now, assume it's subscription toggle
-            if user.subscribed:
-                # Unsubscribe
-                user_update = UserUpdate(subscribed=False)
-                user_repository.update_user(phone, user_update)
-                logger.debug("User subscription updated", phone=phone, subscribed=False)
-                await whatsapp_service.send_subscription_changed_message(
-                    phone, False, current_language
-                )
-            else:
-                # Subscribe  
-                user_update = UserUpdate(subscribed=True)
-                user_repository.update_user(phone, user_update)
-                logger.debug("User subscription updated", phone=phone, subscribed=True)
-                await whatsapp_service.send_subscription_changed_message(
-                    phone, True, current_language
-                )
-                
-        elif number == "2":
-            # Language menu: Hebrew
-            if current_language != Language.HEBREW:
-                user_update = UserUpdate(language=Language.HEBREW)
-                user_repository.update_user(phone, user_update)
-                logger.debug("User language updated", phone=phone, language="Hebrew")
-                await whatsapp_service.send_language_changed_message(
-                    phone, Language.HEBREW
-                )
-            else:
-                await whatsapp_service.send_language_changed_message(
-                    phone, Language.HEBREW
-                )
+        if user.subscribed:
+            # Unsubscribe
+            user_update = UserUpdate(subscribed=False)
+            user_repository.update_user(phone, user_update)
+            logger.debug("User subscription updated", phone=phone, subscribed=False)
+            await whatsapp_service.send_subscription_changed_message(phone, False)
         else:
-            # Unknown number - show main menu
-            await whatsapp_service.send_main_menu(phone, current_language, user)
+            # Subscribe  
+            user_update = UserUpdate(subscribed=True)
+            user_repository.update_user(phone, user_update)
+            logger.debug("User subscription updated", phone=phone, subscribed=True)
+            await whatsapp_service.send_subscription_changed_message(phone, True)
             
     except Exception as e:
-        logger.error("Failed to handle sub menu response",
+        logger.error("Failed to handle subscription toggle",
                     phone=phone,
-                    number=number,
                     error=str(e),
                     error_type=type(e).__name__)
 

@@ -6,7 +6,6 @@ from sqlalchemy import desc
 from src.models.fact import DailyFact, DailyFactCreate
 from src.data_access.database_client import database_client
 from src.utils.logger import get_logger
-from src.config.settings import Language
 
 logger = get_logger(__name__)
 
@@ -36,27 +35,26 @@ class FactRepository:
                         error=str(e))
             raise
     
-    def get_daily_fact(self, fact_date: DateType, language: Language) -> Optional[DailyFact]:
-        """Get daily fact for a specific date and language."""
+    def get_daily_hebrew_fact(self, fact_date: DateType) -> Optional[DailyFact]:
+        """Get daily Hebrew fact for a specific date."""
         try:
             with database_client.get_session() as session:
                 statement = select(DailyFact).where(
                     DailyFact.date == fact_date,
-                    DailyFact.language == language
+                    DailyFact.language == "he"
                 )
                 fact = session.exec(statement).first()
                 
                 if fact:
-                    logger.debug("Daily fact found", date=fact_date, language=language)
+                    logger.debug("Daily Hebrew fact found", date=fact_date)
                 else:
-                    logger.debug("Daily fact not found", date=fact_date, language=language)
+                    logger.debug("Daily Hebrew fact not found", date=fact_date)
                 
                 return fact
                 
         except Exception as e:
-            logger.error("Failed to get daily fact", 
+            logger.error("Failed to get daily Hebrew fact", 
                         date=fact_date, 
-                        language=language, 
                         error=str(e))
             raise
     
@@ -74,76 +72,72 @@ class FactRepository:
             logger.error("Failed to get facts by date", date=fact_date, error=str(e))
             raise
     
-    def get_facts_by_language(self, language: Language, limit: int = 10) -> List[DailyFact]:
-        """Get recent daily facts for a specific language."""
+    def get_recent_hebrew_facts(self, limit: int = 10) -> List[DailyFact]:
+        """Get recent daily Hebrew facts."""
         try:
             with database_client.get_session() as session:
                 statement = (
                     select(DailyFact)
-                    .where(DailyFact.language == language)
+                    .where(DailyFact.language == "he")
                     .order_by(desc(DailyFact.date))
                     .limit(limit)
                 )
                 facts = session.exec(statement).all()
                 
-                logger.debug("Retrieved facts by language", 
-                           language=language, 
+                logger.debug("Retrieved recent Hebrew facts", 
                            count=len(facts), 
                            limit=limit)
                 return facts
                 
         except Exception as e:
-            logger.error("Failed to get facts by language", 
-                        language=language, 
+            logger.error("Failed to get recent Hebrew facts", 
                         error=str(e))
             raise
     
-    def fact_exists(self, fact_date: DateType, language: Language) -> bool:
-        """Check if a daily fact exists for the given date and language."""
+    def hebrew_fact_exists(self, fact_date: DateType) -> bool:
+        """Check if a daily Hebrew fact exists for the given date."""
         try:
             with database_client.get_session() as session:
                 statement = select(DailyFact).where(
                     DailyFact.date == fact_date,
-                    DailyFact.language == language
+                    DailyFact.language == "he"
                 )
                 fact = session.exec(statement).first()
                 
                 exists = fact is not None
-                logger.debug("Fact existence check", 
+                logger.debug("Hebrew fact existence check", 
                            date=fact_date, 
-                           language=language, 
                            exists=exists)
                 
                 return exists
                 
         except Exception as e:
-            logger.error("Failed to check fact existence", 
+            logger.error("Failed to check Hebrew fact existence", 
                         date=fact_date, 
-                        language=language, 
                         error=str(e))
             raise
     
-    def get_latest_fact_by_language(self, language: Language) -> Optional[DailyFact]:
-        """Get the most recent daily fact for a specific language."""
+    def get_latest_hebrew_fact(self) -> Optional[DailyFact]:
+        """Get the most recent daily Hebrew fact."""
         try:
             with database_client.get_session() as session:
                 statement = (
                     select(DailyFact)
-                    .where(DailyFact.language == language)
+                    .where(DailyFact.language == "he")
                     .order_by(desc(DailyFact.date))
                     .limit(1)
                 )
                 fact = session.exec(statement).first()
                 
                 if fact:
-                    logger.debug("Latest fact found", language=language, date=fact.date)
+                    logger.debug("Latest Hebrew fact found", date=fact.date)
                 else:
-                    logger.debug("No facts found", language=language)
+                    logger.debug("No Hebrew facts found")
                 
                 return fact
                 
         except Exception as e:
-            logger.error("Failed to get latest fact", language=language, error=str(e))
+            logger.error("Failed to get latest Hebrew fact", error=str(e))
             raise
     
     def delete_old_facts(self, older_than_date: DateType) -> int:

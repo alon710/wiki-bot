@@ -3,7 +3,7 @@ import asyncio
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioException
 
-from src.config.settings import settings, Language
+from src.config.settings import settings
 from src.models.message import WhatsAppMessage, MessageType
 from src.models.user import User
 from src.utils.logger import get_logger
@@ -28,6 +28,22 @@ class WhatsAppService:
             logger.warning("No WhatsApp templates configured - messages may fail outside session window")
         
         logger.info("WhatsApp service initialized")
+    
+    def _get_template_sid(self, message_type: MessageType) -> Optional[str]:
+        """Get template SID for message type."""
+        template_mapping = {
+            MessageType.WELCOME: settings.twilio.welcome_template_sid,
+            MessageType.SUBSCRIPTION_CHANGED: settings.twilio.subscription_template_sid,
+            MessageType.LANGUAGE_CHANGED: settings.twilio.language_template_sid,
+        }
+        return template_mapping.get(message_type) or settings.twilio.menu_template_sid
+    
+    def _format_template_variables(self, message_type: MessageType, content: str, user=None) -> str:
+        """Format template variables for WhatsApp templates."""
+        # For now, just use content as variable 1
+        # In production, you'd extract specific variables based on template structure
+        import json
+        return json.dumps({"1": content})
     
     async def send_message(self, phone: str, content: str, message_type: MessageType, user=None) -> Optional[str]:
         """
@@ -54,19 +70,35 @@ class WhatsAppService:
             
             # Check if we need to use template message
             should_use_template = False
-            if user and not user.is_in_session_window() and not settings.twilio.is_sandbox:
+            template_sid = None
+            template_variables = None
+            
+            if user and not user.is_in_session_window() and not settings.twilio.is_sandbox and settings.twilio.has_templates:
                 should_use_template = True
-                logger.info("User outside session window, should use template message",
+                template_sid = self._get_template_sid(message_type)
+                template_variables = self._format_template_variables(message_type, content, user)
+                logger.info("User outside session window, using template message",
                            phone=phone,
+                           template_sid=template_sid,
                            last_message_at=user.last_message_at)
             
             # Send message via Twilio
             # Note: Twilio client is synchronous, but we're wrapping it in async context
-            response = self.client.messages.create(
-                body=content,
-                from_=settings.twilio.whatsapp_from,
-                to=to_number
-            )
+            if should_use_template and template_sid:
+                # Use template message
+                response = self.client.messages.create(
+                    content_sid=template_sid,
+                    content_variables=template_variables,
+                    from_=settings.twilio.whatsapp_from,
+                    to=to_number
+                )
+            else:
+                # Use regular message (sandbox or session window)
+                response = self.client.messages.create(
+                    body=content,
+                    from_=settings.twilio.whatsapp_from,
+                    to=to_number
+                )
             
             # Twilio returns message SID
             external_id = response.sid if response else None
@@ -108,11 +140,8 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            # Format the message based on user's language
-            if user.language == Language.HEBREW:
-                formatted_message = f"🧠 עובדה יומית מרתקת:\n\n{fact_content}\n\n📚 מקור: ויקיפדיה"
-            else:
-                formatted_message = f"🧠 Daily Fun Fact:\n\n{fact_content}\n\n📚 Source: Wikipedia"
+            # Format the message in Hebrew
+            formatted_message = f"🧠 עובדה יומית מרתקת:\n\n{fact_content}\n\n📚 מקור: ויקיפדיה"
             
             message_id = await self.send_message(
                 phone=user.phone,
@@ -125,45 +154,41 @@ class WhatsAppService:
         except Exception as e:
             logger.error("Failed to send daily fact",
                         phone=user.phone,
-                        language=user.language,
                         error=str(e))
             return False
     
-    async def send_welcome_message(self, phone: str, language: Language) -> bool:
+    async def send_welcome_message(self, phone: str, user: User = None) -> bool:
         """
-        Send welcome message to a new user.
+        Send welcome message when user first interacts.
         
         Args:
             phone: User's phone number
-            language: User's preferred language
+            user: User object (for session-based messages)
         
         Returns:
             True if successful, False otherwise
         """
         try:
-            if language == Language.HEBREW:
+            if settings.twilio.is_sandbox:
                 content = (
-                    "🎉 ברוך הבא לבוט עובדות ויקיפדיה!\n\n"
-                    "כל יום נשלח לך עובדה מעניינת ומרתקת מויקיפדיה.\n\n"
-                    "פקודות זמינות:\n"
-                    "• /english - החלף לאנגלית\n"
-                    "• /hebrew - החלף לעברית\n"
-                    "• /stop - הפסק קבלת עובדות\n"
-                    "• /start - התחל קבלת עובדות\n"
-                    "• /help - עזרה\n\n"
-                    "תהנה מהעובדות היומיות! 🚀"
+                    "🎉 ברוך הבא לבוט העובדות הישראלי!"
+                    "\n\nכדי לקבל הודעות, תצטרך להצטרף ל-WhatsApp Sandbox של Twilio. "
+                    "שלח את הודעת הקוד הבא ל- +1 (415) 523-8886:"
+                    "\n\njoin @sandbox_keyword"
+                    "\n\nלאחר ההצטרפות, תקבל עובדה מעניינת כל יום בשעה 09:00 UTC.\n\n"
+                    "בחר אפשרות מהתפריט:"
+                    "\n1️⃣ עובדה יומית"
+                    "\n2️⃣ הפסק מנוי"
+                    "\n3️⃣ עזרה"
                 )
             else:
                 content = (
-                    "🎉 Welcome to Wikipedia Facts Bot!\n\n"
-                    "Every day we'll send you an interesting and fascinating fact from Wikipedia.\n\n"
-                    "Available commands:\n"
-                    "• /english - Switch to English\n"
-                    "• /hebrew - Switch to Hebrew\n"
-                    "• /stop - Stop receiving facts\n"
-                    "• /start - Start receiving facts\n"
-                    "• /help - Show this help\n\n"
-                    "Enjoy your daily facts! 🚀"
+                    "🎉 ברוך הבא לבוט העובדות הישראלי!"
+                    "\n\nתקבל עובדה מעניינת כל יום בשעה 09:00 UTC.\n\n"
+                    "בחר אפשרות מהתפריט:"
+                    "\n1️⃣ עובדה יומית"
+                    "\n2️⃣ הפסק מנוי"
+                    "\n3️⃣ עזרה"
                 )
             
             message_id = await self.send_message(
@@ -177,65 +202,26 @@ class WhatsAppService:
         except Exception as e:
             logger.error("Failed to send welcome message",
                         phone=phone,
-                        language=language,
                         error=str(e))
             return False
     
-    async def send_language_changed_message(self, phone: str, new_language: Language) -> bool:
-        """
-        Send language changed confirmation message.
-        
-        Args:
-            phone: User's phone number
-            new_language: New language preference
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            if new_language == Language.HEBREW:
-                content = "✅ השפה שונתה בהצלחה לעברית! העובדות היומיות יישלחו מעתה בעברית."
-            else:
-                content = "✅ Language changed successfully to English! Daily facts will now be sent in English."
-            
-            message_id = await self.send_message(
-                phone=phone,
-                content=content,
-                message_type=MessageType.LANGUAGE_CHANGED
-            )
-            
-            return message_id is not None
-            
-        except Exception as e:
-            logger.error("Failed to send language changed message",
-                        phone=phone,
-                        language=new_language,
-                        error=str(e))
-            return False
     
-    async def send_subscription_changed_message(self, phone: str, subscribed: bool, language: Language) -> bool:
+    async def send_subscription_changed_message(self, phone: str, subscribed: bool) -> bool:
         """
         Send subscription status changed confirmation message.
         
         Args:
             phone: User's phone number
             subscribed: New subscription status
-            language: User's language preference
         
         Returns:
             True if successful, False otherwise
         """
         try:
-            if language == Language.HEBREW:
-                if subscribed:
-                    content = "✅ המנוי חודש בהצלחה! תתחיל לקבל עובדות יומיות שוב."
-                else:
-                    content = "❌ המנוי בוטל בהצלחה. לא תקבל יותר עובדות יומיות. שלח /start כדי להתחיל שוב."
+            if subscribed:
+                content = "✅ המנוי חודש בהצלחה! תתחיל לקבל עובדות יומיות שוב."
             else:
-                if subscribed:
-                    content = "✅ Subscription resumed successfully! You'll start receiving daily facts again."
-                else:
-                    content = "❌ Unsubscribed successfully. You won't receive daily facts anymore. Send /start to resume."
+                content = "❌ המנוי בוטל בהצלחה. לא תקבל יותר עובדות יומיות. שלח /start כדי להתחיל שוב."
             
             message_id = await self.send_message(
                 phone=phone,
@@ -249,46 +235,29 @@ class WhatsAppService:
             logger.error("Failed to send subscription changed message",
                         phone=phone,
                         subscribed=subscribed,
-                        language=language,
                         error=str(e))
             return False
     
-    async def send_help_message(self, phone: str, language: Language) -> bool:
+    async def send_help_message(self, phone: str) -> bool:
         """
-        Send help message with available commands.
+        Send help message with available options.
         
         Args:
             phone: User's phone number
-            language: User's language preference
         
         Returns:
             True if successful, False otherwise
         """
         try:
-            if language == Language.HEBREW:
-                content = (
-                    "📖 עזרה - בוט עובדות ויקיפדיה\n\n"
-                    "פקודות זמינות:\n"
-                    "• /english - החלף לאנגלית\n"
-                    "• /hebrew - החלף לעברית\n"
-                    "• /stop - הפסק קבלת עובדות\n"
-                    "• /start - התחל קבלת עובדות\n"
-                    "• /help - הצג עזרה זו\n\n"
-                    "הבוט שולח עובדה מעניינת אחת ביום בשעה 09:00 UTC.\n\n"
-                    "יש בעיה? צור קשר עם התמיכה שלנו."
-                )
-            else:
-                content = (
-                    "📖 Help - Wikipedia Facts Bot\n\n"
-                    "Available commands:\n"
-                    "• /english - Switch to English\n"
-                    "• /hebrew - Switch to Hebrew\n"
-                    "• /stop - Stop receiving facts\n"
-                    "• /start - Start receiving facts\n"
-                    "• /help - Show this help\n\n"
-                    "The bot sends one interesting fact daily at 09:00 UTC.\n\n"
-                    "Having issues? Contact our support team."
-                )
+            content = (
+                "📖 עזרה - בוט עובדות ויקיפדיה\n\n"
+                "אפשרויות זמינות:\n"
+                "1️⃣ עובדה יומית\n"
+                "2️⃣ הפסק מנוי\n"
+                "3️⃣ עזרה\n\n"
+                "הבוט שולח עובדה מעניינת אחת ביום בשעה 09:00 UTC.\n\n"
+                "יש בעיה? צור קשר עם התמיכה שלנו."
+            )
             
             message_id = await self.send_message(
                 phone=phone,
@@ -301,32 +270,27 @@ class WhatsAppService:
         except Exception as e:
             logger.error("Failed to send help message",
                         phone=phone,
-                        language=language,
                         error=str(e))
             return False
     
-    async def send_error_message(self, phone: str, language: Language) -> bool:
+    async def send_main_menu(self, phone: str, user: User = None) -> bool:
         """
-        Send error message for unrecognized commands.
+        Send main menu for invalid input.
         
         Args:
             phone: User's phone number
-            language: User's language preference
+            user: User object (for session-based messages)
         
         Returns:
             True if successful, False otherwise
         """
         try:
-            if language == Language.HEBREW:
-                content = (
-                    "❓ לא זיהיתי את הפקודה הזו.\n\n"
-                    "שלח /help כדי לראות את הפקודות הזמינות."
-                )
-            else:
-                content = (
-                    "❓ I didn't recognize that command.\n\n"
-                    "Send /help to see available commands."
-                )
+            content = (
+                "❓ אנא בחר מספר מהתפריט:\n\n"
+                "1️⃣ עובדה יומית\n"
+                "2️⃣ הפסק מנוי\n"
+                "3️⃣ עזרה"
+            )
             
             message_id = await self.send_message(
                 phone=phone,
@@ -337,100 +301,76 @@ class WhatsAppService:
             return message_id is not None
             
         except Exception as e:
-            logger.error("Failed to send error message",
+            logger.error("Failed to send main menu",
                         phone=phone,
-                        language=language,
                         error=str(e))
             return False
     
-    async def broadcast_daily_facts(self, users_by_language: Dict[Language, List[User]], facts_by_language: Dict[Language, str]) -> Dict[Language, int]:
+    async def broadcast_daily_facts_hebrew(self, users: List[User], fact_content: str) -> int:
         """
-        Broadcast daily facts to all subscribed users by language.
+        Broadcast daily facts to all subscribed users in Hebrew.
         
         Args:
-            users_by_language: Dictionary mapping languages to lists of users
-            facts_by_language: Dictionary mapping languages to fact content
+            users: List of users to send facts to
+            fact_content: The daily fact content in Hebrew
         
         Returns:
-            Dictionary mapping languages to number of successful sends
+            Number of successful sends
         """
-        results = {}
+        successful_sends = 0
         
-        for language, users in users_by_language.items():
-            if language not in facts_by_language:
-                logger.warning("No fact available for language", language=language)
-                results[language] = 0
-                continue
-            
-            fact_content = facts_by_language[language]
-            successful_sends = 0
-            
-            logger.info("Starting broadcast for language",
-                       language=language,
-                       user_count=len(users))
-            
-            # Send to users in batches to avoid overwhelming the API
-            batch_size = 10
-            for i in range(0, len(users), batch_size):
-                batch = users[i:i + batch_size]
-                batch_tasks = []
-                
-                for user in batch:
-                    task = self.send_daily_fact(user, fact_content)
-                    batch_tasks.append(task)
-                
-                # Execute batch
-                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-                
-                # Count successful sends
-                for result in batch_results:
-                    if isinstance(result, bool) and result:
-                        successful_sends += 1
-                    elif isinstance(result, Exception):
-                        logger.error("Batch send error", error=str(result))
-                
-                # Small delay between batches to be respectful to the API
-                if i + batch_size < len(users):
-                    await asyncio.sleep(1)
-            
-            results[language] = successful_sends
-            logger.info("Broadcast completed for language",
-                       language=language,
-                       successful_sends=successful_sends,
-                       total_users=len(users))
+        logger.info("Starting Hebrew daily fact broadcast",
+                   user_count=len(users))
         
-        return results
+        # Send to users in batches to avoid overwhelming the API
+        batch_size = 10
+        for i in range(0, len(users), batch_size):
+            batch = users[i:i + batch_size]
+            batch_tasks = []
+            
+            for user in batch:
+                task = self.send_daily_fact(user, fact_content)
+                batch_tasks.append(task)
+            
+            # Execute batch
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            
+            # Count successful sends
+            for result in batch_results:
+                if isinstance(result, bool) and result:
+                    successful_sends += 1
+                elif isinstance(result, Exception):
+                    logger.error("Batch send error", error=str(result))
+            
+            # Small delay between batches to be respectful to the API
+            if i + batch_size < len(users):
+                await asyncio.sleep(1)
+        
+        logger.info("Hebrew daily fact broadcast completed",
+                   successful_sends=successful_sends,
+                   total_users=len(users))
+        
+        return successful_sends
     
-    async def send_sandbox_instructions(self, phone: str, language: Language) -> bool:
+    async def send_sandbox_instructions(self, phone: str) -> bool:
         """
         Send Twilio Sandbox join instructions to new users.
         
         Args:
             phone: User's phone number
-            language: User's language preference
         
         Returns:
             True if successful, False otherwise
         """
         try:
-            if language == Language.HEBREW:
-                content = (
-                    "🔧 הודעה חשובה!\n\n"
-                    "אתה משתמש בסביבת הבדיקות של Twilio WhatsApp.\n"
-                    "כדי לקבל הודעות, עליך לשלוח תחילה את המסר:\n"
-                    "join depend-wheat\n\n"
-                    "שלח הודעה זו ל: whatsapp:+14155238886\n\n"
-                    "לאחר מכן תוכל לחזור לכאן ולהתחיל להשתמש בבוט."
-                )
-            else:
-                content = (
-                    "🔧 Important Notice!\n\n"
-                    "You are using the Twilio WhatsApp Sandbox.\n"
-                    "To receive messages, you must first send:\n"
-                    "join depend-wheat\n\n"
-                    "Send this message to: whatsapp:+14155238886\n\n"
-                    "After that, you can return here and start using the bot."
-                )
+            content = (
+                "🔧 הודעה חשובה!\n\n"
+                "אתה משתמש בסביבת הבדיקות של Twilio WhatsApp.\n"
+                "כדי לקבל הודעות, עליך לשלוח תחילה את המסר:\n"
+                "join depend-wheat\n\n"
+                "שלח הודעה זו ל: whatsapp:+14155238886\n\n"
+                "לאחר מכן תוכל לחזור לכאן ולהתחיל להשתמש בבוט."
+            )
             
             message_id = await self.send_message(
                 phone=phone,
@@ -443,41 +383,28 @@ class WhatsAppService:
         except Exception as e:
             logger.error("Failed to send sandbox instructions",
                         phone=phone,
-                        language=language,
                         error=str(e))
             return False
     
-    async def send_main_menu(self, phone: str, language: Language, user=None) -> bool:
+    async def send_main_menu(self, phone: str, user=None) -> bool:
         """
-        Send main menu with text options.
+        Send main menu with text options (Hebrew only).
         
         Args:
             phone: User's phone number
-            language: User's language preference
             user: User object for session tracking (optional)
         
         Returns:
             True if successful, False otherwise
         """
         try:
-            if language == Language.HEBREW:
-                content = (
-                    "🤖 בוט עובדות ויקיפדיה\n\n"
-                    "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
-                    "1️⃣ קבל עובדה יומית\n"
-                    "2️⃣ ניהול מנוי\n"
-                    "3️⃣ שנה שפה\n"
-                    "4️⃣ עזרה"
-                )
-            else:
-                content = (
-                    "🤖 Wikipedia Facts Bot\n\n"
-                    "Choose an action by sending the corresponding number:\n\n"
-                    "1️⃣ Get Daily Fact\n"
-                    "2️⃣ Manage Subscription\n"
-                    "3️⃣ Change Language\n"
-                    "4️⃣ Help"
-                )
+            content = (
+                "🤖 בוט עובדות ויקיפדיה\n\n"
+                "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
+                "1️⃣ קבל עובדה יומית\n"
+                "2️⃣ ניהול מנוי\n"
+                "3️⃣ עזרה"
+            )
             
             message_id = await self.send_message(
                 phone=phone,
@@ -491,17 +418,15 @@ class WhatsAppService:
         except Exception as e:
             logger.error("Failed to send main menu",
                         phone=phone,
-                        language=language,
                         error=str(e))
             return False
     
-    async def send_subscription_menu(self, phone: str, language: Language, current_status: bool, user=None) -> bool:
+    async def send_subscription_menu(self, phone: str, current_status: bool, user=None) -> bool:
         """
-        Send subscription management menu.
+        Send subscription management menu (Hebrew only).
         
         Args:
             phone: User's phone number
-            language: User's language preference
             current_status: Current subscription status
             user: User object for session tracking (optional)
         
@@ -509,40 +434,22 @@ class WhatsAppService:
             True if successful, False otherwise
         """
         try:
-            if language == Language.HEBREW:
-                if current_status:
-                    content = (
-                        "📬 ניהול מנוי\n\n"
-                        "אתה כרגע מנוי לעובדות יומיות.\n"
-                        "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
-                        "1️⃣ בטל מנוי\n"
-                        "0️⃣ חזור לתפריט הראשי"
-                    )
-                else:
-                    content = (
-                        "📬 ניהול מנוי\n\n"
-                        "אתה כרגע לא מנוי לעובדות יומיות.\n"
-                        "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
-                        "1️⃣ הרשם למנוי\n"
-                        "0️⃣ חזור לתפריט הראשי"
-                    )
+            if current_status:
+                content = (
+                    "📬 ניהול מנוי\n\n"
+                    "אתה כרגע מנוי לעובדות יומיות.\n"
+                    "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
+                    "1️⃣ בטל מנוי\n"
+                    "0️⃣ חזור לתפריט הראשי"
+                )
             else:
-                if current_status:
-                    content = (
-                        "📬 Subscription Management\n\n"
-                        "You are currently subscribed to daily facts.\n"
-                        "Choose an action by sending the corresponding number:\n\n"
-                        "1️⃣ Unsubscribe\n"
-                        "0️⃣ Back to Main Menu"
-                    )
-                else:
-                    content = (
-                        "📬 Subscription Management\n\n"
-                        "You are currently not subscribed to daily facts.\n"
-                        "Choose an action by sending the corresponding number:\n\n"
-                        "1️⃣ Subscribe\n"
-                        "0️⃣ Back to Main Menu"
-                    )
+                content = (
+                    "📬 ניהול מנוי\n\n"
+                    "אתה כרגע לא מנוי לעובדות יומיות.\n"
+                    "בחר פעולה על ידי שליחת המספר המתאים:\n\n"
+                    "1️⃣ הרשם למנוי\n"
+                    "0️⃣ חזור לתפריט הראשי"
+                )
             
             message_id = await self.send_message(
                 phone=phone,
