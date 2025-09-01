@@ -318,4 +318,4 @@ This project is licensed under the MIT License.
 For issues and questions:
 - Check the troubleshooting section
 - Review logs for error details
-- Open an issue on GitHub
+- Open an issue on GitHub# wiki-bot
