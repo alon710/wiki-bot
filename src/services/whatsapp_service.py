@@ -32,12 +32,30 @@ class WhatsAppService:
 
         logger.info("WhatsApp service initialized")
 
+    def get_available_templates(self) -> dict:
+        """Get all available template SIDs."""
+        return {
+            "welcome": settings.twilio.welcome_template_sid,
+            "menu": settings.twilio.menu_template_sid,
+            "subscription": settings.twilio.subscription_template_sid,
+            "language": settings.twilio.language_template_sid,
+            "daily_fact": settings.twilio.daily_fact_template_sid,
+            "help": settings.twilio.help_template_sid,
+        }
+
+    def is_template_available(self, message_type: MessageType) -> bool:
+        """Check if template is available for message type."""
+        template_sid = self._get_template_sid(message_type)
+        return bool(template_sid)
+
     def _get_template_sid(self, message_type: MessageType) -> Optional[str]:
         """Get template SID for message type."""
         template_mapping = {
             MessageType.WELCOME: settings.twilio.welcome_template_sid,
             MessageType.SUBSCRIPTION_CHANGED: settings.twilio.subscription_template_sid,
             MessageType.LANGUAGE_CHANGED: settings.twilio.language_template_sid,
+            MessageType.DAILY_FACT: settings.twilio.daily_fact_template_sid,
+            MessageType.HELP: settings.twilio.help_template_sid,
         }
         return template_mapping.get(message_type) or settings.twilio.menu_template_sid
 
@@ -48,7 +66,20 @@ class WhatsAppService:
 
         import json
 
-        return json.dumps({"1": content})
+        # Basic template variables - customize per message type
+        variables = {"1": content}
+        
+        # Add user-specific variables if available
+        if user:
+            variables["2"] = user.phone  # Can be used for personalization
+        
+        # Message type specific variables
+        if message_type == MessageType.DAILY_FACT:
+            variables["3"] = "ויקיפדיה"  # Source
+        elif message_type == MessageType.WELCOME:
+            variables["2"] = "09:00 UTC"  # Delivery time
+        
+        return json.dumps(variables)
 
     async def send_message(
         self, phone: str, content: str, message_type: MessageType, user: Optional[User] = None
