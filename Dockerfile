@@ -43,10 +43,10 @@ USER app
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:80/health || exit 1
 
 # Expose port
-EXPOSE 8000
+EXPOSE 80
 
 # Default command
 CMD ["python", "main.py"]

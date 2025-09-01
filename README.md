@@ -56,7 +56,7 @@ A cost-optimized WhatsApp bot that sends daily Wikipedia facts in English and He
    docker build -t wikibot .
    
    # Run the container
-   docker run -p 8000:8000 --env-file .env wikibot
+   docker run -p 80:80 --env-file .env wikibot
    ```
 
 ### Option 2: Local Installation
@@ -246,10 +246,10 @@ The application includes a production-ready Dockerfile:
 docker build -t wikibot .
 
 # Run with environment variables
-docker run -p 8000:8000 --env-file .env wikibot
+docker run -p 80:80 --env-file .env wikibot
 
 # Or run with individual environment variables
-docker run -p 8000:8000 \
+docker run -p 80:80 \
   -e DATABASE_URL="postgresql://user:pass@host:5432/wikibot" \
   -e TWILIO_ACCOUNT_SID="your-account-sid" \
   -e TWILIO_AUTH_TOKEN="your-auth-token" \
