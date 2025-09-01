@@ -26,8 +26,11 @@ WORKDIR /app
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies using uv
-RUN uv sync --frozen --no-cache
+# Export dependencies to requirements.txt using uv
+RUN uv export --format requirements-txt --no-hashes --output-file requirements.txt
+
+# Install dependencies using uv pip
+RUN uv pip install --system --no-cache-dir -r requirements.txt
 
 # Copy source code
 COPY . .
